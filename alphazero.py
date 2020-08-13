@@ -21,6 +21,7 @@ restore_atari_state,stable_normalizer,smooth,symmetric_remove,Database)
 from rl.make_game import make_game
 
 #### Neural Networks ##
+# TODO: Reimplement this in PyTorch
 class Model():
     
     def __init__(self,Env,lr,n_hidden_layers,n_hidden_units):
@@ -193,7 +194,6 @@ class MCTS():
 #### Agent ##
 def agent(game,n_ep,n_mcts,max_ep_len,lr,c,gamma,data_size,batch_size,temp,n_hidden_layers,n_hidden_units):
     ''' Outer training loop '''
-    #tf.reset_default_graph()
     episode_returns = [] # storage
     timepoints = []
     # Environments
@@ -205,7 +205,8 @@ def agent(game,n_ep,n_mcts,max_ep_len,lr,c,gamma,data_size,batch_size,temp,n_hid
     model = Model(Env=Env,lr=lr,n_hidden_layers=n_hidden_layers,n_hidden_units=n_hidden_units)  
     t_total = 0 # total steps   
     R_best = -np.Inf
- 
+    
+    # TODO: Use PyTorch here
     with tf.Session() as sess:
         model.sess = sess
         sess.run(tf.global_variables_initializer())
