@@ -14,7 +14,6 @@ from rl.make_game import make_game
 
 #### Run the agentAgent ##
 # TODO: refactor this
-# TODO: Add tensorboard for loss, reward and 
 def run(game,n_ep,n_mcts,max_ep_len,lr,c,gamma,data_size,batch_size,temp,n_hidden_layers,n_hidden_units):
     ''' Outer training loop '''
     episode_returns = [] # storage
@@ -109,15 +108,6 @@ if __name__ == '__main__':
                                         max_ep_len=args.max_ep_len,lr=args.lr,c=args.c,gamma=args.gamma,
                                         data_size=args.data_size,batch_size=args.batch_size,temp=args.temp,
                                         n_hidden_layers=args.n_hidden_layers,n_hidden_units=args.n_hidden_units)
-
-    # Finished training: Visualize
-    # fig,ax = plt.subplots(1,figsize=[7,5])
-    # total_eps = len(episode_returns)
-    # episode_returns = smooth(episode_returns,args.window,mode='valid') 
-    # ax.plot(symmetric_remove(np.arange(total_eps),args.window-1),episode_returns,linewidth=4,color='darkred')
-    # ax.set_ylabel('Return')
-    # ax.set_xlabel('Episode',color='darkred')
-    # plt.savefig(os.getcwd()+'/learning_curve.png',bbox_inches="tight",dpi=300)
     
 #    print('Showing best episode with return {}'.format(R_best))
 #    Env = make_game(args.game)

@@ -43,14 +43,14 @@ class Model(nn.Module):
         x = F.elu(self.in_layer(x))
         x = F.elu(self.hidden(x))
         V_hat = self.value_head(x)
-        return V_hat.numpy()
+        return V_hat.detach().cpu().numpy()
     
     @torch.no_grad()
     def predict_pi(self,x):
         x = F.elu(self.in_layer(x))
         x = F.elu(self.hidden(x))
         pi_hat = F.softmax(self.policy_head(x), dim=-1)
-        return pi_hat.numpy() 
+        return pi_hat.detach().cpu().numpy() 
 
 
 def alphaZero_loss(pi_logits, V_hat, V, pi, value_ratio=1):
@@ -78,59 +78,12 @@ def train(model, optimizer, replay_buffer, criterion):
 
             pi_logits, V_hat = model(sb_tensor)
             loss = criterion(pi_logits, V_hat, Vb_tensor, pib_tensor)
-            running_loss.append(loss.item())
+            running_loss.append(loss.detach().item())
             loss.backward()
             optimizer.step()
             batches += 1
 
     return sum(running_loss)/batches
-
-# class Modeltf():
-    
-#     def __init__(self,Env,lr,n_hidden_layers,n_hidden_units):
-#         # Check the Gym environment
-#         self.action_dim, self.action_discrete  = check_space(Env.action_space)
-#         self.state_dim, self.state_discrete  = check_space(Env.observation_space)
-#         if not self.action_discrete: 
-#             raise ValueError('Continuous action space not implemented')
-        
-#         # Placeholders
-#         if not self.state_discrete:
-#             self.x = x = tf.placeholder("float32", shape=np.append(None,self.state_dim),name='x') # state  
-#         else:
-#             self.x = x = tf.placeholder("int32", shape=np.append(None,1)) # state
-#             x =  tf.squeeze(tf.one_hot(x,self.state_dim,axis=1),axis=2)
-        
-#         # Feedforward: Can be modified to any representation function, e.g. convolutions, residual networks, etc. 
-#         for i in range(n_hidden_layers):
-#             x = slim.fully_connected(x,n_hidden_units,activation_fn=tf.nn.elu)
-            
-#         # Output
-#         log_pi_hat = slim.fully_connected(x,self.action_dim,activation_fn=None) 
-#         self.pi_hat = tf.nn.softmax(log_pi_hat) # policy head           
-#         self.V_hat = slim.fully_connected(x,1,activation_fn=None) # value head
-
-#         # Loss
-#         self.V = tf.placeholder("float32", shape=[None,1],name='V')
-#         self.pi = tf.placeholder("float32", shape=[None,self.action_dim],name='pi')
-#         self.V_loss = tf.losses.mean_squared_error(labels=self.V,predictions=self.V_hat)
-#         self.pi_loss = tf.nn.softmax_cross_entropy_with_logits_v2(labels=self.pi,logits=log_pi_hat)
-#         self.loss = self.V_loss + tf.reduce_mean(self.pi_loss)
-        
-#         self.lr = tf.Variable(lr,name="learning_rate",trainable=False)
-#         optimizer = tf.train.RMSPropOptimizer(learning_rate=lr)
-#         self.train_op = optimizer.minimize(self.loss)
-    
-#     def train(self,sb,Vb,pib):
-#         self.sess.run(self.train_op,feed_dict={self.x:sb,
-#                                           self.V:Vb,
-#                                           self.pi:pib})
-    
-    # def predict_V(self,s):
-    #     return self.sess.run(self.V_hat,feed_dict={self.x:s})
-        
-    # def predict_pi(self,s):
-    #     return self.sess.run(self.pi_hat,feed_dict={self.x:s})
    
 ##### MCTS functions #####
       
@@ -258,7 +211,14 @@ class MCTS:
 
 # TODO: implement agent class wrapping MCTS and Model with some parameters
 class Agent:
-    ...
+    def __init__(self):
+        pass
+
+    def load_model(self):
+        pass
+
+    def save_model(self):
+        pass
 
 
 if __name__ == "__main__":
