@@ -74,7 +74,7 @@ def is_atari_game(env):
 
 ### Database ##
     
-class Database():
+class ReplayBuffer():
     ''' Database '''
     
     def __init__(self,max_size,batch_size):
@@ -113,6 +113,9 @@ class Database():
                             
     def __iter__(self):
         return self
+
+    def __len__(self):
+        return len(self.experience)
 
     def __next__(self):
         if (self.sample_index + self.batch_size > self.size) and (not self.sample_index == 0):

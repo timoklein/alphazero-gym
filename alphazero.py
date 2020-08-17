@@ -9,7 +9,6 @@ import torch
 from torch import nn
 from torch import optim
 import torch.nn.functional as F
-from torch.utils.tensorboard import SummaryWriter
 import numpy as np
 # import tensorflow as tf
 # import tensorflow.contrib.slim as slim
@@ -69,20 +68,22 @@ def alphaZero_loss(pi_logits, V_hat, V, pi, value_ratio=1):
 def train(model, optimizer, replay_buffer, criterion):
     optimizer.zero_grad()
     replay_buffer.reshuffle()
+    running_loss = []
+    batches = 0
+    convert = lambda x: torch.from_numpy(x).float()
     for epoch in range(1):
-            for sb,Vb,pib in replay_buffer:
-                # convert states to numpy array 
-                sb = torch.from_numpy(sb).float()
-                Vb = torch.from_numpy(Vb).float()
-                pib = torch.from_numpy(pib).float()
+        for sb,Vb, pib in replay_buffer:
+            # convert states to numpy array 
+            sb_tensor, Vb_tensor, pib_tensor = convert(sb), convert(Vb), convert(pib)
 
-                pi_logits, V_hat = model(sb)
-                loss = alphaZero_loss(pi_logits, V_hat, Vb, pib)
-                loss.backward()
-                optimizer.step()
+            pi_logits, V_hat = model(sb_tensor)
+            loss = criterion(pi_logits, V_hat, Vb_tensor, pib_tensor)
+            running_loss.append(loss.item())
+            loss.backward()
+            optimizer.step()
+            batches += 1
 
-    # TODO: Return average loss as scalar here for logging
-    # return loss
+    return sum(running_loss)/batches
 
 # class Modeltf():
     
