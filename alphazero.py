@@ -201,6 +201,7 @@ def agent(game,n_ep,n_mcts,max_ep_len,lr,c,gamma,data_size,batch_size,temp,n_hid
     is_atari = is_atari_game(Env)
     mcts_env = make_game(game) if is_atari else None
 
+    tb = SummaryWriter(log_dir="logs")
     D = Database(max_size=data_size,batch_size=batch_size)        
     model = Model(Env=Env,lr=lr,n_hidden_layers=n_hidden_layers,n_hidden_units=n_hidden_units)  
     t_total = 0 # total steps   
@@ -241,6 +242,7 @@ def agent(game,n_ep,n_mcts,max_ep_len,lr,c,gamma,data_size,batch_size,temp,n_hid
             
             # Finished episode
             episode_returns.append(R) # store the total episode return
+            tb.add_scalar("Episode reward", R, ep)
             timepoints.append(t_total) # store the timestep count of the episode return
             store_safely(os.getcwd(),'result',{'R':episode_returns,'t':timepoints})  
 
