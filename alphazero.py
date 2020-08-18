@@ -25,8 +25,6 @@ from helpers import (
 
 #### Neural Networks ##
 # TODO: Add variable number of layers
-
-
 class Network(nn.Module):
     def __init__(self, Env, n_hidden_layers, n_hidden_units):
         super().__init__()
@@ -213,7 +211,7 @@ class MCTS:
         else:
             self.root = self.root.child_actions[action].child_state
 
-
+# TODO: Add GPU Training
 class AlphaZeroAgent:
     def __init__(
         self,
@@ -284,6 +282,7 @@ class AlphaZeroAgent:
 
         return loss.detach().item()
 
+    # TODO: Add loading and saving options
     def load_model(self):
         pass
 

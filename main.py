@@ -23,7 +23,6 @@ from rl.make_game import make_game
 
 
 #### Run the agentAgent ##
-# TODO: refactor this
 def run(
     game,
     n_ep,
@@ -110,13 +109,11 @@ def run(
         # Train
         Buffer.reshuffle()
         running_loss = []
-        batches = 0
         for epoch in range(1):
-            for obs in Buffer:
+            for batches, obs in enumerate(Buffer):
                 loss = agent.update(obs)
                 running_loss.append(loss)
-                batches += 1
-        episode_loss = sum(running_loss) / batches
+        episode_loss = sum(running_loss) / (batches + 1)
         tb.add_scalar("Training loss", episode_loss, ep)
 
         reward = np.round(R, 2)
