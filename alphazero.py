@@ -66,16 +66,18 @@ class Network(nn.Module):
 class Action:
     """ Action object """
 
-    def __init__(self, index, parent_state, Q_init=0.0):
+    def __init__(self, index, parent_node, Q_init=0.0):
         self.index = index
-        self.parent_state = parent_state
+        self.parent_node = parent_node
         self.W = 0.0
         self.n = 0
         self.Q = Q_init
 
-    def add_child_state(self, s1, r, terminal, model):
-        self.child_state = State(s1, r, terminal, self, self.parent_state.na, model)
-        return self.child_state
+    def add_child_node(self, state, r, terminal, model):
+        self.child_node = Node(
+            state, r, terminal, self, self.parent_node.num_actions, model
+        )
+        return self.child_node
 
     def update(self, R):
         self.n += 1
@@ -83,49 +85,35 @@ class Action:
         self.Q = self.W / self.n
 
 
-class State:
-    """ State object """
+# TODO: Put these methods into the MCTS for clarity and modularity
+class Node:
+    """ Node object """
 
-    def __init__(self, index, r, terminal, parent_action, na, model):
-        """ Initialize a new state """
-        self.index = index  # state
-        self.r = r  # reward upon arriving in this state
-        self.terminal = terminal  # whether the domain terminated in this state
+    def __init__(self, state, r, terminal, parent_action, num_actions, model):
+        """ Initialize a new node """
+        self.state = state  # game state
+        self.r = r  # reward upon arriving in this node
+        self.terminal = terminal  # whether the domain terminated in this node
         self.parent_action = parent_action
         self.n = 0
-        self.model = model
 
-        self.evaluate()
+        self.evaluate(model)
         # Child actions
-        self.na = na
+        self.num_actions = num_actions
         self.child_actions = [
-            Action(a, parent_state=self, Q_init=self.V) for a in range(na)
+            Action(a, parent_node=self, Q_init=self.V) for a in range(num_actions)
         ]
-        state = torch.from_numpy(index[None,]).float()
+        state = torch.from_numpy(state[None,]).float()
         self.priors = model.predict_pi(state).flatten()
 
-    def select(self, c=1.5):
-        """ Select one of the child actions based on UCT rule """
-        UCT = np.array(
-            [
-                child_action.Q
-                + prior * c * (np.sqrt(self.n + 1) / (child_action.n + 1))
-                for child_action, prior in zip(self.child_actions, self.priors)
-            ]
-        )
-        winner = argmax(UCT)
-        return self.child_actions[winner]
-
-    def evaluate(self):
+    def evaluate(self, model):
         """ Bootstrap the state value """
-        state = torch.from_numpy(self.index[None,]).float()
+        state = torch.from_numpy(self.state[None,]).float()
         self.V = (
-            np.squeeze(self.model.predict_V(state))
-            if not self.terminal
-            else np.array(0.0)
+            np.squeeze(model.predict_V(state)) if not self.terminal else np.array(0.0)
         )
 
-    def update(self):
+    def update_visit_counts(self):
         """ update count on backward pass """
         self.n += 1
 
@@ -133,83 +121,136 @@ class State:
 class MCTS:
     """ MCTS object """
 
-    def __init__(self, root, root_index, model, na, gamma):
-        self.root = None
-        self.root_index = root_index
+    def __init__(
+        self, model, num_actions, is_atari, c_uct, gamma, root_state, root=None
+    ):
+        self.root_node = root
+        self.root_state = root_state
         self.model = model
-        self.na = na
+        self.num_actions = num_actions
+        self.c_uct = c_uct
         self.gamma = gamma
 
-    def search(self, n_traces, c, Env, mcts_env):
-        """ Perform the MCTS search from the root """
-        if self.root is None:
-            self.root = State(
-                self.root_index,
+        self.is_atari = is_atari
+
+    def initialize_search(self):
+        if self.root_node is None:
+            self.root_node = Node(
+                self.root_state,
                 r=0.0,
                 terminal=False,
                 parent_action=None,
-                na=self.na,
+                num_actions=self.num_actions,
                 model=self.model,
             )  # initialize new root
         else:
-            self.root.parent_action = None  # continue from current root
-        if self.root.terminal:
-            raise ValueError("Can't do tree search from a terminal state")
+            self.root_node.parent_action = None  # continue from current root
+        if self.root_node.terminal:
+            raise ValueError("Can't do tree search from a terminal node")
 
-        is_atari = is_atari_game(Env)
-        if is_atari:
+        if self.is_atari:
             snapshot = copy_atari_state(
                 Env
             )  # for Atari: snapshot the root at the beginning
 
+    def search(self, n_traces, Env, mcts_env):
+        """ Perform the MCTS search from the root """
+
+        self.initialize_search()
+
         for i in range(n_traces):
-            state = self.root  # reset to root for new trace
-            if not is_atari:
+            node = self.root_node  # reset to root for new trace
+
+            if not self.is_atari:
                 mcts_env = copy.deepcopy(Env)  # copy original Env to rollout from
             else:
                 restore_atari_state(mcts_env, snapshot)
 
-            while not state.terminal:
-                action = state.select(c=c)
-                s1, r, t, _ = mcts_env.step(action.index)
-                if hasattr(action, "child_state"):
-                    state = action.child_state  # select
+            while not node.terminal:
+                action = self.selectionUCT(node, self.c_uct)
+
+                # take step
+                new_state, reward, terminal, _ = mcts_env.step(action.index)
+
+                if hasattr(action, "child_node"):
+                    node = self.selection(action)
                     continue
                 else:
-                    state = action.add_child_state(s1, r, t, self.model)  # expand
+                    node = self.expansion(action, new_state, reward, terminal)  # expand
                     break
 
-            # Back-up
-            R = state.V
-            while state.parent_action is not None:  # loop back-up until root is reached
-                R = state.r + self.gamma * R
-                action = state.parent_action
-                action.update(R)
-                state = action.parent_state
-                state.update()
+            self.backprop(node, self.gamma)
+
+    @staticmethod
+    def selectionUCT(node, c_uct):
+        """ Select one of the child actions based on UCT rule """
+        UCT = np.array(
+            [
+                child_action.Q
+                + prior * c_uct * (np.sqrt(node.n + 1) / (child_action.n + 1))
+                for child_action, prior in zip(node.child_actions, node.priors)
+            ]
+        )
+        winner = argmax(UCT)
+        return node.child_actions[winner]
+
+    def selectionUniform(node):
+        pass
+
+    @staticmethod
+    def selection(action):
+        return action.child_node
+
+    def expansion(self, action, state, reward, terminal):
+        node = action.add_child_node(state, reward, terminal, self.model)
+        return node
+
+    @staticmethod
+    def simulation(node, n_rollouts):
+        """AlphaZero doesn't simulate but uses the value estimate from the model instead.
+        """
+        pass
+
+    @staticmethod
+    def backprop(node, gamma):
+        R = node.V
+        while node.parent_action is not None:  # loop back-up until root is reached
+            R = node.r + gamma * R
+            action = node.parent_action
+            action.update(R)
+            node = action.parent_node
+            node.update_visit_counts()
 
     def return_results(self, temp):
         """ Process the output at the root node """
-        counts = np.array([child_action.n for child_action in self.root.child_actions])
-        Q = np.array([child_action.Q for child_action in self.root.child_actions])
+        counts = np.array(
+            [child_action.n for child_action in self.root_node.child_actions]
+        )
+        Q = np.array([child_action.Q for child_action in self.root_node.child_actions])
         pi_target = stable_normalizer(counts, temp)
         V_target = np.sum((counts / np.sum(counts)) * Q)[None]
-        return self.root.index, pi_target, V_target
+        return self.root_node.state, pi_target, V_target
 
     def forward(self, action, state):
         """ Move the root forward """
-        if not hasattr(self.root.child_actions[action], "child_state"):
-            self.root = None
-            self.root_index = state
-        elif np.linalg.norm(self.root.child_actions[action].child_state.index - state) > 0.01:
+        if not hasattr(self.root_node.child_actions[action], "child_node"):
+            self.root_node = None
+            self.root_state = state
+        elif (
+            np.linalg.norm(
+                self.root_node.child_actions[action].child_node.state - state
+            )
+            > 0.01
+        ):
             print(
                 "Warning: this domain seems stochastic. Not re-using the subtree for next search. "
                 + "To deal with stochastic environments, implement progressive widening."
             )
-            self.root = None
-            self.root_index = state
+            self.root_node = None
+            self.root_state = state
         else:
-            self.root = self.root.child_actions[action].child_state
+            self.root_node = self.root_node.child_actions[action].child_node
+
 
 # TODO: Add GPU Training
 class AlphaZeroAgent:
@@ -232,29 +273,32 @@ class AlphaZeroAgent:
         self.lr = lr
         self.temperature = temperature
 
-        self.nn = Network(Env, n_hidden_layers=n_hidden_layers, n_hidden_units=n_hidden_units)
+        self.is_atari = is_atari_game(Env)
+
+        self.nn = Network(
+            Env, n_hidden_layers=n_hidden_layers, n_hidden_units=n_hidden_units
+        )
         self.optimizer = optim.RMSprop(
             self.nn.parameters(), lr=self.lr, alpha=0.9, eps=1e-07
         )
 
-    def reset_mcts(self, root_index):
+    def reset_mcts(self, root_state):
         self.mcts = MCTS(
-            root_index=root_index,
-            root=None,
             model=self.nn,
-            na=self.nn.action_dim,
+            num_actions=self.nn.action_dim,
+            is_atari=self.is_atari,
             gamma=self.gamma,
+            c_uct=self.c_uct,
+            root_state=root_state,
         )
 
     def search(self, Env, mcts_env):
-        self.mcts.search(
-            n_traces=self.n_traces, c=self.c_uct, Env=Env, mcts_env=mcts_env
-        )
+        self.mcts.search(n_traces=self.n_traces, Env=Env, mcts_env=mcts_env)
         state, pi, V = self.mcts.return_results(self.temperature)
         return state, pi, V
 
-    def mcts_forward(self, action, state):
-        self.mcts.forward(action, state)
+    def mcts_forward(self, action, node):
+        self.mcts.forward(action, node)
 
     @staticmethod
     def calculate_loss(pi_logits, V_hat, V, pi, value_ratio=1):

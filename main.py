@@ -22,6 +22,17 @@ from helpers import (
 from rl.make_game import make_game
 
 
+def train(buffer, agent):
+    buffer.reshuffle()
+    running_loss = []
+    for epoch in range(1):
+        for batches, obs in enumerate(buffer):
+            loss = agent.update(obs)
+            running_loss.append(loss)
+    episode_loss = sum(running_loss) / (batches + 1)
+    return episode_loss
+
+
 #### Run the agentAgent ##
 def run(
     game,
@@ -36,6 +47,7 @@ def run(
     temp,
     n_hidden_layers,
     n_hidden_units,
+    seed,
 ):
     """ Outer training loop """
     episode_returns = []  # storage
@@ -45,10 +57,9 @@ def run(
     is_atari = is_atari_game(Env)
     mcts_env = make_game(game) if is_atari else None
 
-    tb = SummaryWriter(log_dir="logs")
-    Buffer = ReplayBuffer(max_size=data_size, batch_size=batch_size)
+    tb = SummaryWriter(log_dir="runs")
+    buffer = ReplayBuffer(max_size=data_size, batch_size=batch_size)
     t_total = 0  # total steps
-    R_best = -np.Inf
 
     agent = AlphaZeroAgent(
         Env,
@@ -66,24 +77,21 @@ def run(
         start = time.time()
         state = Env.reset()
         R = 0.0  # Total return counter
-        action_store = []
-        seed = np.random.randint(1e7)  # draw some Env seed
         Env.seed(seed)
         if is_atari:
             mcts_env.reset()
             mcts_env.seed(seed)
 
-        agent.reset_mcts(root_index=state)
+        agent.reset_mcts(root_state=state)
         for t in range(max_ep_len):
             # MCTS step
             # run mcts and extract the root output
             s, pi, V = agent.search(Env=Env, mcts_env=mcts_env)
-            Buffer.store((s, V, pi))
+            buffer.store((s, V, pi))
 
             # Make the true step
             # We sample here from the policy according tot he policy's probabilities
             action = np.random.choice(len(pi), p=pi)
-            action_store.append(action)
             new_state, step_reward, terminal, _ = Env.step(action)
             R += step_reward
             t_total += (
@@ -101,26 +109,16 @@ def run(
         timepoints.append(t_total)  # store the timestep count of the episode return
         store_safely(os.getcwd(), "result", {"R": episode_returns, "t": timepoints})
 
-        if R > R_best:
-            a_best = action_store
-            seed_best = seed
-            R_best = R
-
         # Train
-        Buffer.reshuffle()
-        running_loss = []
-        for epoch in range(1):
-            for batches, obs in enumerate(Buffer):
-                loss = agent.update(obs)
-                running_loss.append(loss)
-        episode_loss = sum(running_loss) / (batches + 1)
+        episode_loss = train(buffer, agent)
+
         tb.add_scalar("Training loss", episode_loss, ep)
 
         reward = np.round(R, 2)
         e_time = np.round((time.time() - start), 1)
         pbar.set_description(f"{ep=}, {reward=}, {e_time=}s")
     # Return results
-    return episode_returns, timepoints, a_best, seed_best, R_best
+    return episode_returns, timepoints
 
 
 if __name__ == "__main__":
@@ -162,9 +160,12 @@ if __name__ == "__main__":
         default=128,
         help="Number of units per hidden layers in NN",
     )
+    parser.add_argument(
+        "--env_seed", type=int, default=34, help="Random seed for the environment",
+    )
 
     args = parser.parse_args()
-    episode_returns, timepoints, a_best, seed_best, R_best = run(
+    episode_returns, timepoints = run(
         game=args.game,
         n_ep=args.n_ep,
         n_traces=args.n_traces,
@@ -177,6 +178,7 @@ if __name__ == "__main__":
         temp=args.temp,
         n_hidden_layers=args.n_hidden_layers,
         n_hidden_units=args.n_hidden_units,
+        seed=args.env_seed,
     )
 
 #    print('Showing best episode with return {}'.format(R_best))
