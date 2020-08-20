@@ -16,7 +16,8 @@ def stable_normalizer(x, temp):
     x = (x / np.max(x)) ** temp
     return np.abs(x / np.sum(x))
 
-
+# TODO: Check how this is different from numpy argmax
+# TODO: If it's different, use numba to speed it up
 def argmax(x):
     """ assumes a 1D vector x """
     x = x.flatten()

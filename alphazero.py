@@ -191,9 +191,11 @@ class MCTS:
                 for child_action, prior in zip(node.child_actions, node.priors)
             ]
         )
-        winner = argmax(UCT)
-        return node.child_actions[winner]
+        # TODO: This argmax method is slow, can maybe optimized
+        max_a = argmax(UCT)
+        return node.child_actions[max_a]
 
+    # TODO: Can use selection uniform for simulation
     def selectionUniform(node):
         pass
 
@@ -221,13 +223,13 @@ class MCTS:
             node = action.parent_node
             node.update_visit_counts()
 
-    def return_results(self, temp):
+    def return_results(self, temperature):
         """ Process the output at the root node """
         counts = np.array(
             [child_action.n for child_action in self.root_node.child_actions]
         )
         Q = np.array([child_action.Q for child_action in self.root_node.child_actions])
-        pi_target = stable_normalizer(counts, temp)
+        pi_target = stable_normalizer(counts, temperature)
         V_target = np.sum((counts / np.sum(counts)) * Q)[None]
         return self.root_node.state, pi_target, V_target
 
