@@ -62,10 +62,7 @@ class ReplayBuffer:
             batch = [self.experience[i] for i in indices]
         self.sample_index += self.batch_size
 
-        arrays = []
-        for i in range(len(batch[0])):
-            to_add = np.array([entry[i] for entry in batch])
-            arrays.append(to_add)
-        return tuple(arrays)
+        state, value, policy = map(np.stack, zip(*batch))
+        return state, value, policy
 
     next = __next__
