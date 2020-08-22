@@ -6,34 +6,11 @@ import os
 import time
 from torch.utils.tensorboard import SummaryWriter
 
-from alphazero import AlphaZeroAgent
-from helpers import (
-    argmax,
-    check_space,
-    is_atari_game,
-    copy_atari_state,
-    store_safely,
-    restore_atari_state,
-    stable_normalizer,
-    smooth,
-    symmetric_remove,
-    ReplayBuffer,
-)
+from alphazero.agents import AlphaZeroAgent
+from alphazero.buffers import ReplayBuffer
+from alphazero.helpers import is_atari_game, store_safely
 from rl.make_game import make_game
 
-
-def train(buffer, agent):
-    buffer.reshuffle()
-    running_loss = []
-    for epoch in range(1):
-        for batches, obs in enumerate(buffer):
-            loss = agent.update(obs)
-            running_loss.append(loss)
-    episode_loss = sum(running_loss) / (batches + 1)
-    return episode_loss
-
-
-#### Run the agentAgent ##
 def run(
     game,
     n_ep,
@@ -110,7 +87,7 @@ def run(
         store_safely(os.getcwd(), "result", {"R": episode_returns, "t": timepoints})
 
         # Train
-        episode_loss = train(buffer, agent)
+        episode_loss = agent.train(buffer)
 
         tb.add_scalar("Training loss", episode_loss, ep)
 
