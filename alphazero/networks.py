@@ -21,7 +21,6 @@ class Network(nn.Module):
         self.in_layer = nn.Linear(self.state_dim[0], n_hidden_units)
         
         self.hidden = nn.Sequential(*layers)
-
         self.policy_head = nn.Linear(n_hidden_units, self.action_dim)
         self.value_head = nn.Linear(n_hidden_units, 1)
 

@@ -89,6 +89,8 @@ def run(
         # Train
         episode_loss = agent.train(buffer)
 
+        agent.save_checkpoint(env=Env)
+
         tb.add_scalar("Training loss", episode_loss, ep)
 
         reward = np.round(R, 2)

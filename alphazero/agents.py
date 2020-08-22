@@ -1,6 +1,8 @@
 import torch
 import torch.nn.functional as F
 from torch import optim
+from pathlib import Path
+from datetime import datetime
 
 from .networks import Network
 from .alphazero import MCTS
@@ -89,9 +91,24 @@ class AlphaZeroAgent:
         episode_loss = sum(running_loss) / (batches + 1)
         return episode_loss
 
-    # TODO: Add loading and saving options
+    # TODO: Add loading ptions
     def load_model(self):
         pass
 
-    def save_model(self):
-        pass
+    def save_checkpoint(self, env):
+        path = Path("models/")
+        if not path.exists():
+            path.mkdir()
+
+        model_path = path/f"{datetime.now()}_{env.unwrapped.spec.id}_.pt"
+        torch.save({
+            "env": env.unwrapped.spec.id,
+            "env_state_dim": self.nn.state_dim[0],
+            "env_action_dim": self.nn.action_dim,
+            "n_hidden_layers" : self.nn.n_hidden_layers,
+            "n_hidden_units": self.nn.n_hidden_units,
+            "model_state_dict": self.nn.state_dict(),
+            "optimizer_state_dict": self.optimizer.state_dict(),
+            }, model_path)
+        torch.save(self.nn.state_dict(), model_path)
+
