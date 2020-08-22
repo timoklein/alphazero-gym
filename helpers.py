@@ -90,17 +90,10 @@ class ReplayBuffer:
         self.sample_index = 0
 
     def clear(self):
-        self.buffer = [None] * self.max_size
+        # self.buffer = [None] * self.max_size
+        self.buffer = []
         self.insert_index = 0
         self.size = 0
-
-    def store(self, experience):
-        self.buffer[self.insert_index % self.max_size] = experience
-        self.insert_index += 1
-        if self.size <= self.max_size:
-            self.size += 1
-        else:
-            self.size = 0
 
     def store_from_array(self, *args):
         for i in range(args[0].shape[0]):
@@ -108,6 +101,16 @@ class ReplayBuffer:
             for arg in args:
                 entry.append(arg[i])
             self.store(entry)
+
+    def store(self, experience):
+        if self.size < self.max_size:
+            self.buffer.append(experience)
+            self.size += 1
+        else:
+            self.buffer[self.insert_index] = experience
+            self.insert_index += 1
+            if self.insert_index >= self.size:
+                self.insert_index = 0
 
     def reshuffle(self):
         self.sample_array = np.arange(self.size)
