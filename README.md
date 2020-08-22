@@ -20,8 +20,11 @@ This repo contains multiple, self-contained implementations of AlphaZero.
 - [ ] Implement Eliot for logging.
 - [ ] More detailled logging for loss components.
 - [ ] Implement SimulationPolicy.
+- [ ] Optimize performance with numba.
+
 - [ ] Implement MCTS progressive widening.
 - [ ] Implement A0C.
+- [ ] Implement continuous simulation policy.
 - [ ] Use Pendulum to test (might need some custom wrappers).
 
 

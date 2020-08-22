@@ -4,9 +4,10 @@
 One-player Alpha Zero
 @author: Thomas Moerland, Delft University of Technology
 """
+from datetime import datetime
 import copy
-from os import stat
 import torch
+import random
 from torch import nn
 from torch import optim
 import torch.nn.functional as F
@@ -24,7 +25,6 @@ from helpers import (
 
 
 #### Neural Networks ##
-# TODO: Add variable number of layers
 class Network(nn.Module):
     def __init__(self, Env, n_hidden_layers, n_hidden_units):
         super().__init__()
@@ -32,16 +32,21 @@ class Network(nn.Module):
         self.n_hidden_layers = n_hidden_layers
         self.n_hidden_units = n_hidden_units
 
+        hidden_layers = []
+        for _ in range(n_hidden_layers):
+            hidden_layers.append(nn.Linear(n_hidden_units, n_hidden_units))
+            hidden_layers.append(nn.ELU())
+
         self.state_dim, self.state_discrete = check_space(Env.observation_space)
         self.action_dim, self.action_discrete = check_space(Env.action_space)
         self.in_layer = nn.Linear(self.state_dim[0], n_hidden_units)
-        self.hidden = nn.Linear(n_hidden_units, n_hidden_units)
+        self.hidden = nn.Sequential(*hidden_layers)
         self.policy_head = nn.Linear(n_hidden_units, self.action_dim)
         self.value_head = nn.Linear(n_hidden_units, 1)
 
     def forward(self, x):
         x = F.elu(self.in_layer(x))
-        x = F.elu(self.hidden(x))
+        x = self.hidden(x)
         # no need for softmax, can be computed directly from cross-entropy loss
         pi_hat = self.policy_head(x)
         V_hat = self.value_head(x)
@@ -50,14 +55,14 @@ class Network(nn.Module):
     @torch.no_grad()
     def predict_V(self, x):
         x = F.elu(self.in_layer(x))
-        x = F.elu(self.hidden(x))
+        x = self.hidden(x)
         V_hat = self.value_head(x)
         return V_hat.detach().cpu().numpy()
 
     @torch.no_grad()
     def predict_pi(self, x):
         x = F.elu(self.in_layer(x))
-        x = F.elu(self.hidden(x))
+        x = self.hidden(x)
         pi_hat = F.softmax(self.policy_head(x), dim=-1)
         return pi_hat.detach().cpu().numpy()
 
@@ -85,7 +90,6 @@ class Action:
         self.Q = self.W / self.n
 
 
-# TODO: Put these methods into the MCTS for clarity and modularity
 class Node:
     """ Node object """
 
@@ -191,13 +195,13 @@ class MCTS:
                 for child_action, prior in zip(node.child_actions, node.priors)
             ]
         )
-        # TODO: This argmax method is slow, can maybe optimized
         max_a = argmax(UCT)
         return node.child_actions[max_a]
 
     # TODO: Can use selection uniform for simulation
     def selectionUniform(node):
-        pass
+        a = random.choice(node.child_actions)
+        return node.child_actions[a]
 
     @staticmethod
     def selection(action):
@@ -338,7 +342,7 @@ class AlphaZeroAgent:
 
 if __name__ == "__main__":
     Env = make_game("CartPole-v0")
-    model = Network(Env, 128)
+    model = Network(Env, 2, 128)
     state_dim, state_discrete = check_space(Env.observation_space)
     action_dim, action_discrete = check_space(Env.action_space)
     print(f"State dimension: {state_dim}, discrete={state_discrete}.")
