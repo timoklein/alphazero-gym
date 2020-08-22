@@ -3,8 +3,6 @@ This repo contains multiple, self-contained implementations of AlphaZero.
 
 * **tf**   
     Base implementation from https://github.com/tmoer/alphazero_singleplayer.  
-* **alphazero_discrete**  
-    PyTorch port with some code restructuring.  
 * **master**  
     Implementation of [A0C: Alpha Zero in Continuous Action Space](https://arxiv.org/pdf/1805.09613.pdf).
 
@@ -16,16 +14,18 @@ This repo contains multiple, self-contained implementations of AlphaZero.
 - [x] Implement Agent abstraction.
 - [x] Create branch for current base version.
 - [x] Create proper policy methods for MCTS.
+- [ ] restructure project.
+- [ ] Decouple node and mcts.
+- [ ] Enable GPU training.
+- [ ] Implement model saving.
+- [ ] Implement Simulation policy
 - [ ] Implement MCTS progressive widening.
 - [ ] Implement A0C.
-- [ ] Enable GPU training.
 - [ ] Use Pendulum to test (might need some custom wrappers).
 
 
 ## Possible Enhancements to try
-- [ ] Maybe parallelize data generation.
 - [ ] Test a prioritized replay buffer.
-- [ ] Try normalizing flow policy.
 - [ ] Warm starting.
 - [ ] Playout cap randomization.
 - [ ] RAD style data augmentations.

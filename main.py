@@ -152,7 +152,7 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--n_hidden_layers", type=int, default=2, help="Number of hidden layers in NN"
+        "--n_hidden_layers", type=int, default=1, help="Number of hidden layers in NN"
     )
     parser.add_argument(
         "--n_hidden_units",
