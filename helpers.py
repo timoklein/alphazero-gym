@@ -16,18 +16,14 @@ def stable_normalizer(x, temp):
     x = (x / np.max(x)) ** temp
     return np.abs(x / np.sum(x))
 
-# TODO: Check how this is different from numpy argmax
-# TODO: If it's different, use numba to speed it up
+
 def argmax(x):
     """ assumes a 1D vector x """
     x = x.flatten()
     if np.any(np.isnan(x)):
         print("Warning: Cannot argmax when vector contains nans, results will be wrong")
-    try:
-        winners = np.argwhere(x == np.max(x)).flatten()
-        winner = random.choice(winners)
-    except:
-        winner = np.argmax(x)  # numerical instability ?
+    winners = np.argwhere(x == np.max(x)).flatten()
+    winner = random.choice(winners)
     return winner
 
 
@@ -56,8 +52,6 @@ def store_safely(folder, name, to_store):
 
 
 ### Atari helpers ###
-
-
 def get_base_env(env):
     """ removes all wrappers """
     while hasattr(env, "env"):
@@ -67,18 +61,14 @@ def get_base_env(env):
 
 def copy_atari_state(env):
     env = get_base_env(env)
+    # return env.ale.cloneSystemState()
     return env.clone_full_state()
-
-
-#    return env.ale.cloneSystemState()
 
 
 def restore_atari_state(env, snapshot):
     env = get_base_env(env)
+    # env.ale.restoreSystemState(snapshot)
     env.restore_full_state(snapshot)
-
-
-#    env.ale.restoreSystemState(snapshot)
 
 
 def is_atari_game(env):
@@ -100,19 +90,17 @@ class ReplayBuffer:
         self.sample_index = 0
 
     def clear(self):
-        self.experience = []
+        self.buffer = [None] * self.max_size
         self.insert_index = 0
         self.size = 0
 
     def store(self, experience):
-        if self.size < self.max_size:
-            self.experience.append(experience)
+        self.buffer[self.insert_index % self.max_size] = experience
+        self.insert_index += 1
+        if self.size <= self.max_size:
             self.size += 1
         else:
-            self.experience[self.insert_index] = experience
-            self.insert_index += 1
-            if self.insert_index >= self.size:
-                self.insert_index = 0
+            self.size = 0
 
     def store_from_array(self, *args):
         for i in range(args[0].shape[0]):
@@ -130,25 +118,29 @@ class ReplayBuffer:
         return self
 
     def __len__(self):
-        return len(self.experience)
+        return len(self.buffer)
 
     def __next__(self):
+        """ This methods keeps track of the samples we already fetched.
+            The sample array is an array containing the indices which have experiences stored.
+            The sample index tracks 
+        """
         if (self.sample_index + self.batch_size > self.size) and (
             not self.sample_index == 0
         ):
-            self.reshuffle()  # Reset for the next epoch
-            raise (StopIteration)
+            # Reset for the next epoch and stop loop
+            self.reshuffle()
+            raise StopIteration
 
         if self.sample_index + 2 * self.batch_size > self.size:
             indices = self.sample_array[self.sample_index :]
-            batch = [self.experience[i] for i in indices]
+            batch = [self.buffer[i] for i in indices]
         else:
             indices = self.sample_array[
                 self.sample_index : self.sample_index + self.batch_size
             ]
-            batch = [self.experience[i] for i in indices]
+            batch = [self.buffer[i] for i in indices]
         self.sample_index += self.batch_size
-
         arrays = []
         for i in range(len(batch[0])):
             to_add = np.array([entry[i] for entry in batch])
@@ -159,8 +151,6 @@ class ReplayBuffer:
 
 
 ### Visualization ##
-
-
 def symmetric_remove(x, n):
     """ removes n items from beginning and end """
     odd = is_odd(n)
