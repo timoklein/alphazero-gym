@@ -1,4 +1,3 @@
-from torch import optim
 import numpy as np
 from tqdm import trange
 import argparse
@@ -6,31 +5,10 @@ import os
 import time
 from torch.utils.tensorboard import SummaryWriter
 
-from alphazero import AlphaZeroAgent
-from helpers import (
-    argmax,
-    check_space,
-    is_atari_game,
-    copy_atari_state,
-    store_safely,
-    restore_atari_state,
-    stable_normalizer,
-    smooth,
-    symmetric_remove,
-    ReplayBuffer,
-)
+from alphazero.agents import AlphaZeroAgent
+from alphazero.buffers import ReplayBuffer
+from alphazero.helpers import is_atari_game, store_safely
 from rl.make_game import make_game
-
-
-def train(buffer, agent):
-    buffer.reshuffle()
-    running_loss = []
-    for epoch in range(1):
-        for batches, obs in enumerate(buffer):
-            loss = agent.update(obs)
-            running_loss.append(loss)
-    episode_loss = sum(running_loss) / (batches + 1)
-    return episode_loss
 
 
 #### Run the agentAgent ##
@@ -47,6 +25,7 @@ def run(
     temp,
     n_hidden_layers,
     n_hidden_units,
+    device,
     seed,
 ):
     """ Outer training loop """
@@ -70,6 +49,7 @@ def run(
         temperature=temp,
         c_uct=c,
         gamma=gamma,
+        device=device
     )
 
     pbar = trange(n_ep)
@@ -110,7 +90,7 @@ def run(
         store_safely(os.getcwd(), "result", {"R": episode_returns, "t": timepoints})
 
         # Train
-        episode_loss = train(buffer, agent)
+        episode_loss = agent.train(buffer)
 
         tb.add_scalar("Training loss", episode_loss, ep)
 
@@ -152,13 +132,16 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--n_hidden_layers", type=int, default=2, help="Number of hidden layers in NN"
+        "--n_hidden_layers", type=int, default=0, help="Number of hidden layers in NN"
     )
     parser.add_argument(
         "--n_hidden_units",
         type=int,
         default=128,
         help="Number of units per hidden layers in NN",
+    )
+    parser.add_argument(
+        "--device", type=str, default="cpu", help="Set the device for the neural network.",
     )
     parser.add_argument(
         "--env_seed", type=int, default=34, help="Random seed for the environment",
@@ -178,6 +161,7 @@ if __name__ == "__main__":
         temp=args.temp,
         n_hidden_layers=args.n_hidden_layers,
         n_hidden_units=args.n_hidden_units,
+        device=args.device,
         seed=args.env_seed,
     )
 
