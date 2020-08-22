@@ -16,21 +16,16 @@ This repo contains multiple, self-contained implementations of AlphaZero.
 - [x] Implement Agent abstraction.
 - [x] Create branch for current base version.
 - [x] Create proper policy methods for MCTS.
-- [x] Enable GPU training.
-- [x] Implement model saving and loading.
-- [ ] Implement Eliot for logging.
-- [ ] More detailled logging for loss components.
-- [x] Implement SimulationPolicy.
-- [ ] Optimize performance with numba.
-
 - [ ] Implement MCTS progressive widening.
 - [ ] Implement A0C.
-- [ ] Implement continuous simulation policy.
+- [ ] Enable GPU training.
 - [ ] Use Pendulum to test (might need some custom wrappers).
 
 
 ## Possible Enhancements to try
+- [ ] Maybe parallelize data generation.
 - [ ] Test a prioritized replay buffer.
+- [ ] Try normalizing flow policy.
 - [ ] Warm starting.
 - [ ] Playout cap randomization.
 - [ ] RAD style data augmentations.
