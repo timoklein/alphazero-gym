@@ -143,22 +143,35 @@ if __name__ == "__main__":
         "--env_seed", type=int, default=34, help="Random seed for the environment",
     )
 
-    args = parser.parse_args()
-    episode_returns, timepoints = run(
-        game=args.game,
-        n_ep=args.n_ep,
-        n_traces=args.n_traces,
-        max_ep_len=args.max_ep_len,
-        lr=args.lr,
-        c=args.c,
-        gamma=args.gamma,
-        data_size=args.data_size,
-        batch_size=args.batch_size,
-        temp=args.temp,
-        n_hidden_layers=args.n_hidden_layers,
-        n_hidden_units=args.n_hidden_units,
-        seed=args.env_seed,
+    # args = parser.parse_args()
+    # episode_returns, timepoints = run(
+    #     game=args.game,
+    #     n_ep=args.n_ep,
+    #     n_traces=args.n_traces,
+    #     max_ep_len=args.max_ep_len,
+    #     lr=args.lr,
+    #     c=args.c,
+    #     gamma=args.gamma,
+    #     data_size=args.data_size,
+    #     batch_size=args.batch_size,
+    #     temp=args.temp,
+    #     n_hidden_layers=args.n_hidden_layers,
+    #     n_hidden_units=args.n_hidden_units,
+    #     seed=args.env_seed,
+    # )
+
+    Env = make_game("CartPole-v0")
+    agent = AlphaZeroAgent(
+        Env,
+        n_hidden_layers=1,
+        n_hidden_units=64,
+        n_traces=25,
+        lr=0.001,
+        temperature=1,
+        c_uct=3,
+        gamma=1,
     )
+    agent.load_checkpoint("2020_08_25__07_24_01_CartPole-v0")
 
 #    print('Showing best episode with return {}'.format(R_best))
 #    Env = make_game(args.game)

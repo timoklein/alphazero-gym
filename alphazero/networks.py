@@ -1,12 +1,16 @@
+from typing import Tuple
+import numpy as np
 import torch
 from torch import nn
 import torch.nn.functional as F
 
-from .helpers import check_space
 
-class Network(nn.Module):
-    def __init__(self, Env, n_hidden_layers, n_hidden_units):
+class NetworkDiscrete(nn.Module):
+    def __init__(self, state_dim: int, action_dim: int, n_hidden_layers: int, n_hidden_units: int):
         super().__init__()
+
+        self.state_dim = state_dim
+        self.action_dim = action_dim
 
         self.n_hidden_layers = n_hidden_layers
         self.n_hidden_units = n_hidden_units
@@ -16,15 +20,14 @@ class Network(nn.Module):
             layers.append(nn.Linear(n_hidden_units, n_hidden_units))
             layers.append(nn.ELU())
 
-        self.state_dim, self.state_discrete = check_space(Env.observation_space)
-        self.action_dim, self.action_discrete = check_space(Env.action_space)
-        self.in_layer = nn.Linear(self.state_dim[0], n_hidden_units)
+        self.in_layer = nn.Linear(self.state_dim, n_hidden_units)
         
         self.hidden = nn.Sequential(*layers)
+
         self.policy_head = nn.Linear(n_hidden_units, self.action_dim)
         self.value_head = nn.Linear(n_hidden_units, 1)
 
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         x = F.elu(self.in_layer(x))
         x = self.hidden(x)
         # no need for softmax, can be computed directly from cross-entropy loss
@@ -33,14 +36,14 @@ class Network(nn.Module):
         return pi_hat, V_hat
 
     @torch.no_grad()
-    def predict_V(self, x):
+    def predict_V(self, x: torch.Tensor) -> np.array:
         x = F.elu(self.in_layer(x))
         x = self.hidden(x)
         V_hat = self.value_head(x)
         return V_hat.detach().cpu().numpy()
 
     @torch.no_grad()
-    def predict_pi(self, x):
+    def predict_pi(self, x: torch.Tensor) -> np.array:
         x = F.elu(self.in_layer(x))
         x = self.hidden(x)
         pi_hat = F.softmax(self.policy_head(x), dim=-1)
