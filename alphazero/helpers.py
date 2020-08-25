@@ -19,16 +19,14 @@ def stable_normalizer(x, temp) -> float:
     return np.abs(x / np.sum(x))
 
 
-def argmax(x) -> int:
+def argmax(x):
     """ assumes a 1D vector x """
     x = x.flatten()
     if np.any(np.isnan(x)):
         print("Warning: Cannot argmax when vector contains nans, results will be wrong")
-    try:
-        winners = np.argwhere(x == np.max(x)).flatten()
-        winner = random.choice(winners)
-    except:
-        winner = np.argmax(x)  # numerical instability ?
+
+    winners = np.where(x == np.max(x))
+    winner = random.choice(winners[0])
     return winner
 
 
