@@ -10,7 +10,8 @@ from typing import Dict, Tuple
 from torch.optim.rmsprop import RMSprop
 
 from .networks import NetworkDiscrete
-from .alphazero import NNMCTSDiscrete, ActionDiscrete, NodeDiscrete
+from .mcts import NNMCTSDiscrete
+from .states import ActionDiscrete, NodeDiscrete
 from .helpers import is_atari_game, check_space
 from .buffers import ReplayBuffer
 
@@ -72,14 +73,14 @@ class AlphaZeroAgent:
 
     def act(
         self, Env: gym.Env, mcts_env: gym.Env, deterministic: bool = False
-    ) -> Tuple[int, np.array, np.array, float]:
+    ) -> Tuple[int, np.array, np.array, np.array]:
         self.mcts.search(n_traces=self.n_traces, Env=Env, mcts_env=mcts_env)
         state, pi, V = self.mcts.return_results(self.temperature)
         # sample an action from the policy or pick best action if deterministic
         action = pi.argmax() if deterministic else np.random.choice(len(pi), p=pi)
         return action, state, pi, V
 
-    def mcts_forward(self, action: ActionDiscrete, node: NodeDiscrete) -> None:
+    def mcts_forward(self, action: int, node: np.array) -> None:
         self.mcts.forward(action, node)
 
     def calculate_loss(

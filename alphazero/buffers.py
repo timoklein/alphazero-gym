@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 import random
 import numpy as np
 from typing import Tuple
@@ -20,7 +19,7 @@ class ReplayBuffer:
         self.insert_index = 0
         self.size = 0
 
-    def store(self, experience: Tuple[np.array, float, np.array]) -> None:
+    def store(self, experience: Tuple[np.array, np.array, np.array]) -> None:
         if self.size < self.max_size:
             self.experience.append(experience)
             self.size += 1

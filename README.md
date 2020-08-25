@@ -18,12 +18,13 @@ Base implementation.
 - [x] restructure project.
 - [x] Implement model saving and loading.
 - [x] Implement more detailed logging.
-- [ ] Decouple node and mcts.
-- [ ] Enable GPU training.
+- [x] Decouple node and mcts.
+- [ ] Implement plain MCTS without neural network.
 - [ ] Implement Simulation policy
 - [ ] Implement MCTS progressive widening.
 - [ ] Implement A0C.
 - [ ] Use Pendulum to test (might need some custom wrappers).
+- [ ] Enable GPU training.
 
 
 ## Possible Enhancements to try
