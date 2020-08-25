@@ -70,12 +70,14 @@ class AlphaZeroAgent:
             root_state=root_state,
         )
 
-    def search(
-        self, Env: gym.Env, mcts_env: gym.Env
-    ) -> Tuple[np.array, np.array, float]:
+    def act(
+        self, Env: gym.Env, mcts_env: gym.Env, deterministic: bool = False
+    ) -> Tuple[int, np.array, np.array, float]:
         self.mcts.search(n_traces=self.n_traces, Env=Env, mcts_env=mcts_env)
         state, pi, V = self.mcts.return_results(self.temperature)
-        return state, pi, V
+        # sample an action from the policy or pick best action if deterministic
+        action = pi.argmax() if deterministic else np.random.choice(len(pi), p=pi)
+        return action, state, pi, V
 
     def mcts_forward(self, action: Action, node: Node) -> None:
         self.mcts.forward(action, node)

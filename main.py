@@ -37,7 +37,6 @@ def run_discrete_agent(
     is_atari = is_atari_game(Env)
     mcts_env = make_game(game) if is_atari else None
 
-    
     buffer = ReplayBuffer(max_size=buffer_size, batch_size=batch_size)
     t_total = 0  # total steps
 
@@ -55,21 +54,21 @@ def run_discrete_agent(
 
     repo = git.Repo(search_parent_directories=True)
     config = {
-            "Commit": repo.head.object.hexsha,
-            "Environment": Env.unwrapped.spec.id,
-            "Discrete Env": agent.action_discrete,
-            "MCTS_traces": agent.n_traces,
-            "UCT constant": agent.c_uct,
-            "Discount factor": agent.gamma,
-            "Softmax temperature": agent.temperature,
-            "Network hidden layers": agent.n_hidden_layers,
-            "Network hidden units": agent.n_hidden_units,
-            "Value loss ratio": agent.value_loss_ratio,
-            "Learning rate": agent.lr,
-            "Batch size": buffer.batch_size,
-            "Replay buffer size": buffer.max_size,
-            "Environment seed": seed,
-        }
+        "Commit": repo.head.object.hexsha,
+        "Environment": Env.unwrapped.spec.id,
+        "Discrete Env": agent.action_discrete,
+        "MCTS_traces": agent.n_traces,
+        "UCT constant": agent.c_uct,
+        "Discount factor": agent.gamma,
+        "Softmax temperature": agent.temperature,
+        "Network hidden layers": agent.n_hidden_layers,
+        "Network hidden units": agent.n_hidden_units,
+        "Value loss ratio": agent.value_loss_ratio,
+        "Learning rate": agent.lr,
+        "Batch size": buffer.batch_size,
+        "Replay buffer size": buffer.max_size,
+        "Environment seed": seed,
+    }
 
     run = wandb.init(name="AlphaZero Discrete", project="a0c", config=config)
 
@@ -87,12 +86,10 @@ def run_discrete_agent(
         for t in range(max_ep_len):
             # MCTS step
             # run mcts and extract the root output
-            s, pi, V = agent.search(Env=Env, mcts_env=mcts_env)
+            action, s, pi, V = agent.act(Env=Env, mcts_env=mcts_env)
             buffer.store((s, V, pi))
 
             # Make the true step
-            # We sample here from the policy according tot he policy's probabilities
-            action = np.random.choice(len(pi), p=pi)
             new_state, step_reward, terminal, _ = Env.step(action)
             R += step_reward
             t_total += (
@@ -112,9 +109,17 @@ def run_discrete_agent(
         # Train
         episode_loss = agent.train(buffer)
 
-        # agent.save_checkpoint(env=Env)
+        agent.save_checkpoint(env=Env)
 
-        run.log({"Episode reward": R, "Total loss": episode_loss["loss"], "Policy loss": episode_loss["policy_loss"], "Value loss": episode_loss["value_loss"]}, step=ep)
+        run.log(
+            {
+                "Episode reward": R,
+                "Total loss": episode_loss["loss"],
+                "Policy loss": episode_loss["policy_loss"],
+                "Value loss": episode_loss["value_loss"],
+            },
+            step=ep,
+        )
 
         reward = np.round(R, 2)
         e_time = np.round((time.time() - start), 1)
