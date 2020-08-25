@@ -27,6 +27,7 @@ Base implementation.
 
 
 ## Possible Enhancements to try
+- [ ] Value loss scaling.
 - [ ] Test a prioritized replay buffer.
 - [ ] Warm starting.
 - [ ] Playout cap randomization.

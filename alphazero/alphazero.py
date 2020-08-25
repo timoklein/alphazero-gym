@@ -7,13 +7,49 @@ One-player Alpha Zero
 import copy
 import torch
 import numpy as np
-
+from abc import ABC, abstractmethod
 
 from .helpers import copy_atari_state, restore_atari_state, stable_normalizer, argmax
 
+class MCTS(ABC):
+
+    @abstractmethod
+    def selection(self):
+        raise NotImplementedError
+    
+    @abstractmethod
+    def expansion(self):
+        raise NotImplementedError
+    
+    @abstractmethod
+    def simulation(self):
+        raise NotImplementedError
+
+    @abstractmethod
+    def backprop(self):
+        raise NotImplementedError
+
+    @abstractmethod
+    def search(self):
+        raise NotImplementedError
+
+class Action(ABC):
+
+    @abstractmethod
+    def add_child_node(self):
+        raise NotImplementedError
+    
+    @abstractmethod
+    def update(self):
+        raise NotImplementedError
+
+class Node(ABC):
+    @abstractmethod
+    def update_visit_counts(self):
+        raise NotImplementedError
 
 ##### MCTS functions #####
-class Action:
+class ActionDiscrete:
     """ Action object """
 
     def __init__(self, index, parent_node, Q_init=0.0):
@@ -24,7 +60,7 @@ class Action:
         self.Q = Q_init
 
     def add_child_node(self, state, r, terminal, model):
-        self.child_node = Node(
+        self.child_node = NodeDiscrete(
             state, r, terminal, self, self.parent_node.num_actions, model
         )
         return self.child_node
@@ -35,8 +71,7 @@ class Action:
         self.Q = self.W / self.n
 
 
-# TODO: Put these methods into the MCTS for clarity and modularity
-class Node:
+class NodeDiscrete:
     """ Node object """
 
     def __init__(self, state, r, terminal, parent_action, num_actions, model):
@@ -51,7 +86,7 @@ class Node:
         # Child actions
         self.num_actions = num_actions
         self.child_actions = [
-            Action(a, parent_node=self, Q_init=self.V) for a in range(num_actions)
+            ActionDiscrete(a, parent_node=self, Q_init=self.V) for a in range(num_actions)
         ]
         state = torch.from_numpy(state[None,]).float()
         self.priors = model.predict_pi(state).flatten()
@@ -68,7 +103,7 @@ class Node:
         self.n += 1
 
 
-class MCTS:
+class NNMCTSDiscrete:
     """ MCTS object """
 
     def __init__(
@@ -85,7 +120,7 @@ class MCTS:
 
     def initialize_search(self):
         if self.root_node is None:
-            self.root_node = Node(
+            self.root_node = NodeDiscrete(
                 self.root_state,
                 r=0.0,
                 terminal=False,
@@ -181,6 +216,7 @@ class MCTS:
         V_target = np.sum((counts / np.sum(counts)) * Q)[None]
         return self.root_node.state, pi_target, V_target
 
+    # TODO: Implement progressive widening
     def forward(self, action, state):
         """ Move the root forward """
         if not hasattr(self.root_node.child_actions[action], "child_node"):

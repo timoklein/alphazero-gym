@@ -109,7 +109,7 @@ def run_discrete_agent(
         # Train
         episode_loss = agent.train(buffer)
 
-        agent.save_checkpoint(env=Env)
+        # agent.save_checkpoint(env=Env)
 
         run.log(
             {
