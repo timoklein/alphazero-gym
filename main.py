@@ -4,6 +4,7 @@ import argparse
 import os
 import time
 import git
+import wandb
 from torch.utils.tensorboard import SummaryWriter
 
 from alphazero.agents import AlphaZeroAgent
@@ -36,7 +37,7 @@ def run_discrete_agent(
     is_atari = is_atari_game(Env)
     mcts_env = make_game(game) if is_atari else None
 
-    tb = SummaryWriter(log_dir="runs")
+    
     buffer = ReplayBuffer(max_size=buffer_size, batch_size=batch_size)
     t_total = 0  # total steps
 
@@ -53,9 +54,7 @@ def run_discrete_agent(
     )
 
     repo = git.Repo(search_parent_directories=True)
-
-    tb.add_hparams(
-        {
+    config = {
             "Commit": repo.head.object.hexsha,
             "Environment": Env.unwrapped.spec.id,
             "Discrete Env": agent.action_discrete,
@@ -67,9 +66,12 @@ def run_discrete_agent(
             "Network hidden units": agent.n_hidden_units,
             "Value loss ratio": agent.value_loss_ratio,
             "Learning rate": agent.lr,
-        },
-        metric_dict={},
-    )
+            "Batch size": buffer.batch_size,
+            "Replay buffer size": buffer.max_size,
+            "Environment seed": seed,
+        }
+
+    run = wandb.init(name="AlphaZero Discrete", project="a0c", config=config)
 
     pbar = trange(n_ep)
     for ep in pbar:
@@ -103,7 +105,6 @@ def run_discrete_agent(
                 agent.mcts_forward(action, new_state)
 
         # store the total episode return
-        tb.add_scalar("Episode reward", R, ep)
         episode_returns.append(R)
         timepoints.append(t_total)  # store the timestep count of the episode return
         store_safely(os.getcwd(), "result", {"R": episode_returns, "t": timepoints})
@@ -113,9 +114,7 @@ def run_discrete_agent(
 
         # agent.save_checkpoint(env=Env)
 
-        tb.add_scalar("Total loss", episode_loss["loss"], ep)
-        tb.add_scalar("Policy loss", episode_loss["policy_loss"], ep)
-        tb.add_scalar("Value loss", episode_loss["value_loss"], ep)
+        run.log({"Episode reward": R, "Total loss": episode_loss["loss"], "Policy loss": episode_loss["policy_loss"], "Value loss": episode_loss["value_loss"]}, step=ep)
 
         reward = np.round(R, 2)
         e_time = np.round((time.time() - start), 1)
