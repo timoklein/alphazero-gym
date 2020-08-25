@@ -17,6 +17,7 @@ Base implementation.
 - [x] Create proper policy methods for MCTS.
 - [x] restructure project.
 - [x] Implement model saving and loading.
+- [x] Implement more detailed logging.
 - [ ] Decouple node and mcts.
 - [ ] Enable GPU training.
 - [ ] Implement Simulation policy

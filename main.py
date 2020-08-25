@@ -1,9 +1,9 @@
-from torch import optim
 import numpy as np
 from tqdm import trange
 import argparse
 import os
 import time
+import git
 from torch.utils.tensorboard import SummaryWriter
 
 from alphazero.agents import AlphaZeroAgent
@@ -11,20 +11,22 @@ from alphazero.buffers import ReplayBuffer
 from alphazero.helpers import is_atari_game, store_safely
 from rl.make_game import make_game
 
-def run(
-    game,
-    n_ep,
-    n_traces,
-    max_ep_len,
-    lr,
-    c,
-    gamma,
-    data_size,
-    batch_size,
-    temp,
-    n_hidden_layers,
-    n_hidden_units,
-    seed,
+
+def run_discrete_agent(
+    game: str,
+    n_ep: int,
+    n_traces: int,
+    max_ep_len: int,
+    lr: float,
+    c: float,
+    gamma: float,
+    buffer_size: int,
+    batch_size: int,
+    temp: float,
+    n_hidden_layers: int,
+    n_hidden_units: int,
+    value_loss_ratio: float,
+    seed: int,
 ):
     """ Outer training loop """
     episode_returns = []  # storage
@@ -35,18 +37,38 @@ def run(
     mcts_env = make_game(game) if is_atari else None
 
     tb = SummaryWriter(log_dir="runs")
-    buffer = ReplayBuffer(max_size=data_size, batch_size=batch_size)
+    buffer = ReplayBuffer(max_size=buffer_size, batch_size=batch_size)
     t_total = 0  # total steps
 
     agent = AlphaZeroAgent(
         Env,
         n_hidden_layers=n_hidden_layers,
         n_hidden_units=n_hidden_units,
+        value_loss_ratio=value_loss_ratio,
         n_traces=n_traces,
         lr=lr,
         temperature=temp,
         c_uct=c,
         gamma=gamma,
+    )
+
+    repo = git.Repo(search_parent_directories=True)
+
+    tb.add_hparams(
+        {
+            "Commit": repo.head.object.hexsha,
+            "Environment": Env.unwrapped.spec.id,
+            "Discrete Env": agent.action_discrete,
+            "MCTS_traces": agent.n_traces,
+            "UCT constant": agent.c_uct,
+            "Discount factor": agent.gamma,
+            "Softmax temperature": agent.temperature,
+            "Network hidden layers": agent.n_hidden_layers,
+            "Network hidden units": agent.n_hidden_units,
+            "Value loss ratio": agent.value_loss_ratio,
+            "Learning rate": agent.lr,
+        },
+        metric_dict={},
     )
 
     pbar = trange(n_ep)
@@ -89,9 +111,11 @@ def run(
         # Train
         episode_loss = agent.train(buffer)
 
-        agent.save_checkpoint(env=Env)
+        # agent.save_checkpoint(env=Env)
 
-        tb.add_scalar("Training loss", episode_loss, ep)
+        tb.add_scalar("Total loss", episode_loss["loss"], ep)
+        tb.add_scalar("Policy loss", episode_loss["policy_loss"], ep)
+        tb.add_scalar("Value loss", episode_loss["value_loss"], ep)
 
         reward = np.round(R, 2)
         e_time = np.round((time.time() - start), 1)
@@ -103,7 +127,7 @@ def run(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--game", default="CartPole-v0", help="Training environment")
-    parser.add_argument("--n_ep", type=int, default=500, help="Number of episodes")
+    parser.add_argument("--n_ep", type=int, default=300, help="Number of episodes")
     parser.add_argument(
         "--n_traces", type=int, default=25, help="Number of MCTS traces per step"
     )
@@ -123,13 +147,12 @@ if __name__ == "__main__":
     )
     parser.add_argument("--gamma", type=float, default=1.0, help="Discount parameter")
     parser.add_argument(
-        "--data_size", type=int, default=1000, help="Dataset size (FIFO)"
+        "--buffer_size", type=int, default=1000, help="Size of the FIFO replay buffer"
     )
     parser.add_argument("--batch_size", type=int, default=32, help="Minibatch size")
     parser.add_argument(
         "--window", type=int, default=25, help="Smoothing window for visualization"
     )
-
     parser.add_argument(
         "--n_hidden_layers", type=int, default=1, help="Number of hidden layers in NN"
     )
@@ -140,38 +163,32 @@ if __name__ == "__main__":
         help="Number of units per hidden layers in NN",
     )
     parser.add_argument(
+        "--value_ratio",
+        type=float,
+        default=1,
+        help="Value loss ratio in the AlphaZero loss",
+    )
+    parser.add_argument(
         "--env_seed", type=int, default=34, help="Random seed for the environment",
     )
 
-    # args = parser.parse_args()
-    # episode_returns, timepoints = run(
-    #     game=args.game,
-    #     n_ep=args.n_ep,
-    #     n_traces=args.n_traces,
-    #     max_ep_len=args.max_ep_len,
-    #     lr=args.lr,
-    #     c=args.c,
-    #     gamma=args.gamma,
-    #     data_size=args.data_size,
-    #     batch_size=args.batch_size,
-    #     temp=args.temp,
-    #     n_hidden_layers=args.n_hidden_layers,
-    #     n_hidden_units=args.n_hidden_units,
-    #     seed=args.env_seed,
-    # )
-
-    Env = make_game("CartPole-v0")
-    agent = AlphaZeroAgent(
-        Env,
-        n_hidden_layers=1,
-        n_hidden_units=64,
-        n_traces=25,
-        lr=0.001,
-        temperature=1,
-        c_uct=3,
-        gamma=1,
+    args = parser.parse_args()
+    episode_returns, timepoints = run_discrete_agent(
+        game=args.game,
+        n_ep=args.n_ep,
+        n_traces=args.n_traces,
+        max_ep_len=args.max_ep_len,
+        lr=args.lr,
+        c=args.c,
+        gamma=args.gamma,
+        buffer_size=args.buffer_size,
+        batch_size=args.batch_size,
+        temp=args.temp,
+        n_hidden_layers=args.n_hidden_layers,
+        n_hidden_units=args.n_hidden_units,
+        value_loss_ratio=args.value_ratio,
+        seed=args.env_seed,
     )
-    agent.load_checkpoint("2020_08_25__07_24_01_CartPole-v0")
 
 #    print('Showing best episode with return {}'.format(R_best))
 #    Env = make_game(args.game)

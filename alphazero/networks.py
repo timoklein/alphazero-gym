@@ -6,7 +6,9 @@ import torch.nn.functional as F
 
 
 class NetworkDiscrete(nn.Module):
-    def __init__(self, state_dim: int, action_dim: int, n_hidden_layers: int, n_hidden_units: int):
+    def __init__(
+        self, state_dim: int, action_dim: int, n_hidden_layers: int, n_hidden_units: int
+    ) -> None:
         super().__init__()
 
         self.state_dim = state_dim
@@ -21,7 +23,7 @@ class NetworkDiscrete(nn.Module):
             layers.append(nn.ELU())
 
         self.in_layer = nn.Linear(self.state_dim, n_hidden_units)
-        
+
         self.hidden = nn.Sequential(*layers)
 
         self.policy_head = nn.Linear(n_hidden_units, self.action_dim)
