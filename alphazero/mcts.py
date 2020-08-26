@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-One-player Alpha Zero
-@author: Thomas Moerland, Delft University of Technology
-"""
 import copy
 from typing import Tuple
 import gym
@@ -29,6 +25,10 @@ class MCTS(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def simulation(self):
+        raise NotImplementedError
+
+    @abstractmethod
     def backprop(self):
         raise NotImplementedError
 
@@ -37,7 +37,7 @@ class MCTS(ABC):
         raise NotImplementedError
 
 
-class NNMCTSDiscrete(MCTS):
+class MCTSDiscrete(MCTS):
     """ MCTS object """
 
     def __init__(
@@ -68,40 +68,52 @@ class NNMCTSDiscrete(MCTS):
                 parent_action=None,
                 num_actions=self.num_actions,
             )
-            self.evaluation(self.root_node)
         else:
-            self.root_node.parent_action = None  # continue from current root
+            # continue from current root
+            self.root_node.parent_action = None
         if self.root_node.terminal:
             raise ValueError("Can't do tree search from a terminal node")
 
+        # for Atari: snapshot the root at the beginning
         if self.is_atari:
-            snapshot = copy_atari_state(
-                Env
-            )  # for Atari: snapshot the root at the beginning
+            snapshot = copy_atari_state(Env)
 
-    def evaluation(self, node: NodeDiscrete) -> None:
+    def evaluation(self, node: NodeDiscrete, V: float = None) -> None:
         state = torch.from_numpy(node.state[None,]).float()
-        node.V = (
-            np.squeeze(self.model.predict_V(state))
-            if not node.terminal
-            else np.array(0.0)
-        )
+
+        # only use the neural network to estimate the value if we have none
+        if not V:
+            node.V = (
+                np.squeeze(self.model.predict_V(state))
+                if not node.terminal
+                else np.array(0.0)
+            )
+        else:
+            node.V = V
         node.child_actions = [
             ActionDiscrete(a, parent_node=node, Q_init=node.V)
             for a in range(node.num_actions)
         ]
         node.priors = self.model.predict_pi(state).flatten()
 
-    def search(self, n_traces: int, Env: gym.Env, mcts_env: gym.Env):
+    def search(self, n_traces: int, Env: gym.Env, mcts_env: gym.Env, simulation: bool=False):
         """ Perform the MCTS search from the root """
 
         self.initialize_search()
+        if simulation:
+            mcts_env = copy.deepcopy(Env)
+            V = self.simulation(mcts_env)
+            self.evaluation(self.root_node, V)
+        else:
+            self.evaluation(self.root_node)
 
         for i in range(n_traces):
-            node = self.root_node  # reset to root for new trace
+            # reset to root for new trace
+            node = self.root_node
 
             if not self.is_atari:
-                mcts_env = copy.deepcopy(Env)  # copy original Env to rollout from
+                # copy original Env to rollout from
+                mcts_env = copy.deepcopy(Env)
             else:
                 restore_atari_state(mcts_env, snapshot)
 
@@ -110,12 +122,20 @@ class NNMCTSDiscrete(MCTS):
 
                 # take step
                 new_state, reward, terminal, _ = mcts_env.step(action.index)
-
                 if getattr(action, "child_node"):
+                    # selection
                     node = self.selection(action)
                     continue
                 else:
-                    node = self.expansion(action, new_state, reward, terminal)  # expand
+                    # expansion
+                    node = self.expansion(action, new_state, reward, terminal)
+
+                    # Evaluate node -> Perform simulation if not already in a terminal state
+                    if not terminal and simulation:
+                        V = self.simulation(mcts_env)
+                        self.evaluation(node, V)
+                    else:
+                        self.evaluation(node)
                     break
 
             self.backprop(node, self.gamma)
@@ -137,17 +157,28 @@ class NNMCTSDiscrete(MCTS):
     def selection(action: ActionDiscrete) -> NodeDiscrete:
         return action.child_node
 
+    @staticmethod
+    def simulation(mcts_env: gym.Env) -> np.array:
+        V = 0
+        terminal = False
+        while not terminal:
+            action = mcts_env.action_space.sample()
+            _, reward, terminal, _ = mcts_env.step(action)
+            V += reward
+
+        return np.array(V)
+
     def expansion(
         self, action: ActionDiscrete, state: np.array, reward: float, terminal: bool
     ) -> NodeDiscrete:
         node = action.add_child_node(state, reward, terminal)
-        self.evaluation(node)
         return node
 
     @staticmethod
     def backprop(node: NodeDiscrete, gamma: float):
         R = node.V
-        while node.parent_action is not None:  # loop back-up until root is reached
+        # loop back-up until root is reached
+        while node.parent_action is not None:
             R = node.r + gamma * R
             action = node.parent_action
             action.update(R)

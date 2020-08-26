@@ -5,7 +5,6 @@ import os
 import time
 import git
 import wandb
-from torch.utils.tensorboard import SummaryWriter
 
 from alphazero.agents import AlphaZeroAgent
 from alphazero.buffers import ReplayBuffer
@@ -52,25 +51,25 @@ def run_discrete_agent(
         gamma=gamma,
     )
 
-    repo = git.Repo(search_parent_directories=True)
-    config = {
-        "Commit": repo.head.object.hexsha,
-        "Environment": Env.unwrapped.spec.id,
-        "Discrete Env": agent.action_discrete,
-        "MCTS_traces": agent.n_traces,
-        "UCT constant": agent.c_uct,
-        "Discount factor": agent.gamma,
-        "Softmax temperature": agent.temperature,
-        "Network hidden layers": agent.n_hidden_layers,
-        "Network hidden units": agent.n_hidden_units,
-        "Value loss ratio": agent.value_loss_ratio,
-        "Learning rate": agent.lr,
-        "Batch size": buffer.batch_size,
-        "Replay buffer size": buffer.max_size,
-        "Environment seed": seed,
-    }
+    # repo = git.Repo(search_parent_directories=True)
+    # config = {
+    #     "Commit": repo.head.object.hexsha,
+    #     "Environment": Env.unwrapped.spec.id,
+    #     "Discrete Env": agent.action_discrete,
+    #     "MCTS_traces": agent.n_traces,
+    #     "UCT constant": agent.c_uct,
+    #     "Discount factor": agent.gamma,
+    #     "Softmax temperature": agent.temperature,
+    #     "Network hidden layers": agent.n_hidden_layers,
+    #     "Network hidden units": agent.n_hidden_units,
+    #     "Value loss ratio": agent.value_loss_ratio,
+    #     "Learning rate": agent.lr,
+    #     "Batch size": buffer.batch_size,
+    #     "Replay buffer size": buffer.max_size,
+    #     "Environment seed": seed,
+    # }
 
-    run = wandb.init(name="AlphaZero Discrete", project="a0c", config=config)
+    # run = wandb.init(name="AlphaZero Discrete", project="a0c", config=config)
 
     pbar = trange(n_ep)
     for ep in pbar:
@@ -111,15 +110,15 @@ def run_discrete_agent(
 
         # agent.save_checkpoint(env=Env)
 
-        run.log(
-            {
-                "Episode reward": R,
-                "Total loss": episode_loss["loss"],
-                "Policy loss": episode_loss["policy_loss"],
-                "Value loss": episode_loss["value_loss"],
-            },
-            step=ep,
-        )
+        # run.log(
+        #     {
+        #         "Episode reward": R,
+        #         "Total loss": episode_loss["loss"],
+        #         "Policy loss": episode_loss["policy_loss"],
+        #         "Value loss": episode_loss["value_loss"],
+        #     },
+        #     step=ep,
+        # )
 
         reward = np.round(R, 2)
         e_time = np.round((time.time() - start), 1)
@@ -138,7 +137,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--max_ep_len",
         type=int,
-        default=300,
+        default=200,
         help="Maximum number of steps per episode",
     )
     parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")

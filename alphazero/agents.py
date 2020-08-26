@@ -10,8 +10,7 @@ from typing import Dict, Tuple
 from torch.optim.rmsprop import RMSprop
 
 from .networks import NetworkDiscrete
-from .mcts import NNMCTSDiscrete
-from .states import ActionDiscrete, NodeDiscrete
+from .mcts import MCTSDiscrete
 from .helpers import is_atari_game, check_space
 from .buffers import ReplayBuffer
 
@@ -62,7 +61,7 @@ class AlphaZeroAgent:
         return self.nn.n_hidden_units
 
     def reset_mcts(self, root_state: np.array) -> None:
-        self.mcts = NNMCTSDiscrete(
+        self.mcts = MCTSDiscrete(
             model=self.nn,
             num_actions=self.nn.action_dim,
             is_atari=self.is_atari,
