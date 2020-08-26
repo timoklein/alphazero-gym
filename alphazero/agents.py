@@ -6,6 +6,7 @@ import gym
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, Tuple
+from abc import ABC, abstractmethod
 
 from torch.optim.rmsprop import RMSprop
 
@@ -14,8 +15,32 @@ from .mcts import MCTSDiscrete
 from .helpers import is_atari_game, check_space
 from .buffers import ReplayBuffer
 
+class Agent(ABC):
+    @abstractmethod
+    def act(self):
+        ...
+    
+    @abstractmethod
+    def calculate_loss(self):
+        ...
 
-class AlphaZeroAgent:
+    @abstractmethod
+    def update(self):
+        ...
+
+    @abstractmethod
+    def train(self):
+        ...
+
+    @abstractmethod
+    def load_checkpoint(self):
+        ...
+
+    @abstractmethod
+    def save_checkpoint(self):
+        ...
+
+class AlphaZeroAgent(Agent):
     def __init__(
         self,
         Env: gym.Env,

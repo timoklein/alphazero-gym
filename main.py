@@ -102,8 +102,6 @@ def run_discrete_agent(
 
         # store the total episode return
         episode_returns.append(R)
-        timepoints.append(t_total)  # store the timestep count of the episode return
-        store_safely(os.getcwd(), "result", {"R": episode_returns, "t": timepoints})
 
         # Train
         episode_loss = agent.train(buffer)

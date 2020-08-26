@@ -14,27 +14,27 @@ from .helpers import copy_atari_state, restore_atari_state, stable_normalizer, a
 class MCTS(ABC):
     @abstractmethod
     def selection(self):
-        raise NotImplementedError
+        ...
 
     @abstractmethod
     def expansion(self):
-        raise NotImplementedError
+        ...
 
     @abstractmethod
     def evaluation(self):
-        raise NotImplementedError
+        ...
 
     @abstractmethod
     def simulation(self):
-        raise NotImplementedError
+        ...
 
     @abstractmethod
     def backprop(self):
-        raise NotImplementedError
+        ...
 
     @abstractmethod
     def search(self):
-        raise NotImplementedError
+        ...
 
 
 class MCTSDiscrete(MCTS):

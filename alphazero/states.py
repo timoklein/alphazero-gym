@@ -9,11 +9,11 @@ class Action(ABC):
 
     @abstractmethod
     def add_child_node(self):
-        raise NotImplementedError
+        ...
 
     @abstractmethod
     def update(self):
-        raise NotImplementedError
+        ...
 
 
 class Node(ABC):
@@ -32,7 +32,7 @@ class Node(ABC):
 
     @abstractmethod
     def update_visit_counts(self):
-        raise NotImplementedError
+        ...
 
 
 ##### MCTS functions #####
