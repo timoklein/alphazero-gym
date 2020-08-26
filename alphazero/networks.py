@@ -5,6 +5,7 @@ from torch import nn
 import torch.nn.functional as F
 
 
+# TODO: Implement continuous network
 class NetworkDiscrete(nn.Module):
     def __init__(
         self, state_dim: int, action_dim: int, n_hidden_layers: int, n_hidden_units: int

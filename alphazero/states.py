@@ -35,31 +35,6 @@ class Node(ABC):
         ...
 
 
-##### MCTS functions #####
-class ActionDiscrete(Action):
-    """ Action object """
-
-    def __init__(self, index, parent_node, Q_init):
-        self.index = index
-        self.parent_node = parent_node
-        self.W = 0.0
-        self.n = 0
-        self.Q = Q_init
-
-        self.child_node = None
-
-    def add_child_node(self, state, r, terminal):
-        self.child_node = NodeDiscrete(
-            state, r, terminal, self, self.parent_node.num_actions
-        )
-        return self.child_node
-
-    def update(self, R):
-        self.n += 1
-        self.W += R
-        self.Q = self.W / self.n
-
-
 class NodeDiscrete(Node):
     """ Node object """
 
@@ -87,3 +62,83 @@ class NodeDiscrete(Node):
     def update_visit_counts(self) -> None:
         """ update count on backward pass """
         self.n += 1
+
+
+# TODO: Implement continuous node
+class NodeContinuous(Node):
+    """ Node object """
+
+    def __init__(
+        self,
+        state: np.array,
+        r: float,
+        terminal: bool,
+        parent_action: ActionContinuous,
+        num_actions: int,
+    ) -> None:
+        """ Initialize a new node """
+        self.state = state  # game state
+        self.r = r  # reward upon arriving in this node
+        self.terminal = terminal  # whether the domain terminated in this node
+        self.parent_action = parent_action
+        self.n = 0
+        self.V = None
+
+        # Child actions
+        self.num_actions = num_actions
+        self.child_actions = None
+        self.priors = None
+
+    def update_visit_counts(self) -> None:
+        """ update count on backward pass """
+        self.n += 1
+
+
+class ActionDiscrete(Action):
+    """ Action object """
+
+    def __init__(self, index: int, parent_node: NodeDiscrete, Q_init: float) -> None:
+        self.index = index
+        self.parent_node = parent_node
+        self.W = 0.0
+        self.n = 0
+        self.Q = Q_init
+
+        self.child_node = None
+
+    def add_child_node(self, state: np.array, r: float, terminal: bool) -> NodeDiscrete:
+        self.child_node = NodeDiscrete(
+            state, r, terminal, self, self.parent_node.num_actions
+        )
+        return self.child_node
+
+    def update(self, R: float) -> None:
+        self.n += 1
+        self.W += R
+        self.Q = self.W / self.n
+
+
+# TODO: Implement continuous action
+class ActionContinuous(Action):
+    """ Action object """
+
+    def __init__(self, index, parent_node: NodeContinuous, Q_init: float):
+        self.index = index
+        self.parent_node = parent_node
+        self.W = 0.0
+        self.n = 0
+        self.Q = Q_init
+
+        self.child_node = None
+
+    def add_child_node(self, state: np.array, r: float, terminal: bool) -> NodeContinuous:
+        self.child_node = NodeDiscrete(
+            state, r, terminal, self, self.parent_node.num_actions
+        )
+        return self.child_node
+
+    def update(self, R: float) -> None:
+        self.n += 1
+        self.W += R
+        self.Q = self.W / self.n
+

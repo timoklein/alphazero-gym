@@ -36,7 +36,6 @@ class MCTS(ABC):
     def search(self):
         ...
 
-
 class MCTSDiscrete(MCTS):
     """ MCTS object """
 
@@ -214,3 +213,6 @@ class MCTSDiscrete(MCTS):
             self.root_state = state
         else:
             self.root_node = self.root_node.child_actions[action].child_node
+
+
+# TODO: Implement continuous MCTS
