@@ -43,7 +43,7 @@ class NodeDiscrete(Node):
         state: np.array,
         r: float,
         terminal: bool,
-        parent_action: ActionDiscrete,
+        parent_action: "ActionDiscrete",
         num_actions: int,
     ) -> None:
         """ Initialize a new node """
@@ -73,7 +73,7 @@ class NodeContinuous(Node):
         state: np.array,
         r: float,
         terminal: bool,
-        parent_action: ActionContinuous,
+        parent_action: "ActionContinuous",
         num_actions: int,
     ) -> None:
         """ Initialize a new node """

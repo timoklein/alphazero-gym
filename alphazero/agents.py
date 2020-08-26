@@ -10,7 +10,7 @@ from abc import ABC, abstractmethod
 
 from torch.optim.rmsprop import RMSprop
 
-from .networks import NetworkDiscrete
+from .networks import NetworkContinuous, NetworkDiscrete
 from .mcts import MCTSDiscrete
 from .helpers import is_atari_game, check_space
 from .buffers import ReplayBuffer
@@ -224,11 +224,10 @@ class A0CAgent(Agent):
         self.temperature = temperature
         self.value_loss_ratio = value_loss_ratio
 
-        self.is_atari = is_atari_game(Env)
-
-        self.nn = NetworkDiscrete(
+        # action_dim*2 -> Needs both location and scale for one dimension
+        self.nn = NetworkContinuous(
             self.state_dim,
-            self.action_dim,
+            self.action_dim*2,
             n_hidden_layers=n_hidden_layers,
             n_hidden_units=n_hidden_units,
         )
@@ -248,7 +247,6 @@ class A0CAgent(Agent):
         self.mcts = MCTSDiscrete(
             model=self.nn,
             num_actions=self.nn.action_dim,
-            is_atari=self.is_atari,
             gamma=self.gamma,
             c_uct=self.c_uct,
             root_state=root_state,
@@ -258,7 +256,7 @@ class A0CAgent(Agent):
     def act(
         self, Env: gym.Env, mcts_env: gym.Env, deterministic: bool = False
     ) -> Tuple[int, np.array, np.array, np.array]:
-        self.mcts.search(n_traces=self.n_traces, Env=Env, mcts_env=mcts_env)
+        self.mcts.search(n_traces=self.n_traces, Env=Env, mcts_env=mcts_env, simulation=False)
         state, pi, V = self.mcts.return_results(self.temperature)
         # sample an action from the policy or pick best action if deterministic
         action = pi.argmax() if deterministic else np.random.choice(len(pi), p=pi)
