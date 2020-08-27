@@ -126,4 +126,4 @@ class NetworkContinuous(nn.Module):
         normal = Normal(mean, std)
         action = normal.sample()
         log_prob = normal.log_prob(action)
-        return action.detach().cpu().numpy(), mean.detach().cpu().numpy(), log_prob
+        return action.detach().cpu().numpy(), log_prob, mean.detach().cpu().numpy()
