@@ -5,13 +5,13 @@ import time
 import git
 import wandb
 
-from alphazero.agents import AlphaZeroAgent
+from alphazero.agents import A0CAgent
 from alphazero.buffers import ReplayBuffer
 from alphazero.helpers import is_atari_game
 from rl.make_game import make_game
 
 # TODO: Add params for continuous run
-def run_discrete_agent(
+def run_continuous_agent(
     game: str,
     n_ep: int,
     n_traces: int,
@@ -42,7 +42,7 @@ def run_discrete_agent(
     buffer = ReplayBuffer(max_size=buffer_size, batch_size=batch_size)
     t_total = 0  # total steps
 
-    agent = AlphaZeroAgent(
+    agent = A0CAgent(
         Env,
         n_hidden_layers=n_hidden_layers,
         n_hidden_units=n_hidden_units,
@@ -54,7 +54,7 @@ def run_discrete_agent(
         c_pw=c_pw,
         kappa=kappa,
         tau=tau,
-        alpha=tau,
+        alpha=alpha,
         gamma=gamma,
     )
 
@@ -92,11 +92,11 @@ def run_discrete_agent(
         for t in range(max_ep_len):
             # MCTS step
             # run mcts and extract the root output
-            action, s, pi, V = agent.act(Env=Env, mcts_env=mcts_env)
-            buffer.store((s, V, pi))
+            action, s, log_probs, log_counts, V = agent.act(Env=Env, mcts_env=mcts_env)
+            buffer.store((s, log_probs, log_counts, V))
 
             # Make the true step
-            new_state, step_reward, terminal, _ = Env.step(action)
+            _, step_reward, terminal, _ = Env.step(action)
             R += step_reward
             t_total += (
                 n_traces  # total number of environment steps (counts the mcts steps)
@@ -104,8 +104,6 @@ def run_discrete_agent(
 
             if terminal:
                 break
-            else:
-                agent.mcts_forward(action, new_state)
 
         # store the total episode return
         episode_returns.append(R)
@@ -120,6 +118,7 @@ def run_discrete_agent(
         #         "Episode reward": R,
         #         "Total loss": episode_loss["loss"],
         #         "Policy loss": episode_loss["policy_loss"],
+        #         "Entropy loss": episode_loss["entropy_loss"],
         #         "Value loss": episode_loss["value_loss"],
         #     },
         #     step=ep,
@@ -134,7 +133,7 @@ def run_discrete_agent(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--game", default="CartPole-v0", help="Training environment")
+    parser.add_argument("--game", default="Pendulum-v0", help="Training environment")
     parser.add_argument("--n_ep", type=int, default=300, help="Number of episodes")
     parser.add_argument(
         "--n_traces", type=int, default=25, help="Number of MCTS traces per step"
@@ -185,13 +184,17 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    episode_returns, timepoints = run_discrete_agent(
+    episode_returns, timepoints = run_continuous_agent(
         game=args.game,
         n_ep=args.n_ep,
         n_traces=args.n_traces,
         max_ep_len=args.max_ep_len,
         lr=args.lr,
         c_uct=args.c_uct,
+        c_pw=args.c_pw,
+        kappa=args.kappa,
+        tau=args.tau,
+        alpha=args.alpha,
         gamma=args.gamma,
         buffer_size=args.buffer_size,
         batch_size=args.batch_size,
