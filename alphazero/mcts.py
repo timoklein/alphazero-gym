@@ -127,7 +127,7 @@ class MCTSDiscrete(MCTS):
                 action = self.selectionUCT(self.c_uct, node)
 
                 # take step
-                new_state, reward, terminal, _ = mcts_env.step(action.index)
+                new_state, reward, terminal, _ = mcts_env.step(action.action)
                 if getattr(action, "child_node"):
                     # selection
                     node = self.selection(action)
@@ -299,7 +299,7 @@ class MCTSContinuous(MCTS):
                 action = self.selectionUCT(self.c_uct, node)
 
                 # take step
-                new_state, reward, terminal, _ = mcts_env.step(action.index)
+                new_state, reward, terminal, _ = mcts_env.step(action.action)
                 if getattr(action, "child_node"):
                     # selection
                     node = self.selection(action)

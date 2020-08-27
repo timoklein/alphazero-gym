@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 
 class Action(ABC):
 
-    __slots__ = ("index", "parent_node", "W", "n", "Q", "child_node")
+    __slots__ = ("action", "parent_node", "W", "n", "Q", "child_node")
 
     @abstractmethod
     def add_child_node(self):
@@ -24,9 +24,7 @@ class Node(ABC):
         "terminal",
         "parent_action",
         "n",
-        "num_actions",
         "V",
-        "priors",
         "child_actions",
     )
 
@@ -37,6 +35,8 @@ class Node(ABC):
 
 class NodeDiscrete(Node):
     """ Node object """
+
+    __slots__ = "priors", "num_actions"
 
     def __init__(
         self,
@@ -64,7 +64,6 @@ class NodeDiscrete(Node):
         self.n += 1
 
 
-# TODO: Implement continuous node
 class NodeContinuous(Node):
     """ Node object """
 
@@ -74,7 +73,6 @@ class NodeContinuous(Node):
         r: float,
         terminal: bool,
         parent_action: "ActionContinuous",
-        num_actions: int,
     ) -> None:
         """ Initialize a new node """
         self.state = state  # game state
@@ -85,9 +83,11 @@ class NodeContinuous(Node):
         self.V = None
 
         # Child actions
-        self.num_actions = num_actions
         self.child_actions = None
-        self.priors = None
+
+    @property
+    def num_children(self):
+        return len(self.child_actions)
 
     def update_visit_counts(self) -> None:
         """ update count on backward pass """
@@ -97,8 +97,8 @@ class NodeContinuous(Node):
 class ActionDiscrete(Action):
     """ Action object """
 
-    def __init__(self, index: int, parent_node: NodeDiscrete, Q_init: float) -> None:
-        self.index = index
+    def __init__(self, action: int, parent_node: NodeDiscrete, Q_init: float) -> None:
+        self.action = action
         self.parent_node = parent_node
         self.W = 0.0
         self.n = 0
@@ -118,12 +118,11 @@ class ActionDiscrete(Action):
         self.Q = self.W / self.n
 
 
-# TODO: Implement continuous action
 class ActionContinuous(Action):
     """ Action object """
 
-    def __init__(self, index, parent_node: NodeContinuous, Q_init: float):
-        self.index = index
+    def __init__(self, action_value: float, parent_node: NodeContinuous, Q_init: float):
+        self.action_value = action_value
         self.parent_node = parent_node
         self.W = 0.0
         self.n = 0
@@ -131,10 +130,10 @@ class ActionContinuous(Action):
 
         self.child_node = None
 
-    def add_child_node(self, state: np.array, r: float, terminal: bool) -> NodeContinuous:
-        self.child_node = NodeDiscrete(
-            state, r, terminal, self, self.parent_node.num_actions
-        )
+    def add_child_node(
+        self, state: np.array, r: float, terminal: bool
+    ) -> NodeContinuous:
+        self.child_node = NodeDiscrete(state, r, terminal, self, 0)
         return self.child_node
 
     def update(self, R: float) -> None:
