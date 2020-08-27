@@ -7,7 +7,7 @@ import torch
 import numpy as np
 from abc import ABC, abstractmethod
 
-from .states import ActionDiscrete, NodeContinuous, NodeDiscrete
+from .states import ActionContinuous, ActionDiscrete, NodeContinuous, NodeDiscrete
 from .helpers import copy_atari_state, restore_atari_state, stable_normalizer, argmax
 
 
@@ -275,7 +275,7 @@ class MCTSContinuous(MCTS):
         num_pw_actions = node.m_progressive_widening(self.c_pw, self.kappa)
         actions, log_probs, _ = self.model.sample(state.repeat(num_pw_actions, 1))
         node.child_actions = [
-            ActionDiscrete(a, lp, parent_node=node, Q_init=node.V)
+            ActionContinuous(a, lp, parent_node=node, Q_init=node.V)
             for a, lp in zip(actions, log_probs)
         ]
 
@@ -323,7 +323,7 @@ class MCTSContinuous(MCTS):
             self.backprop(node, self.gamma)
 
     @staticmethod
-    def selectionUCT(c_uct, node: NodeDiscrete) -> ActionDiscrete:
+    def selectionUCT(c_uct, node: NodeContinuous) -> ActionContinuous:
         """ Select one of the child actions based on UCT rule """
         UCT = np.array(
             [
@@ -335,7 +335,7 @@ class MCTSContinuous(MCTS):
         return node.child_actions[winner]
 
     @staticmethod
-    def selection(action: ActionDiscrete) -> NodeDiscrete:
+    def selection(action: ActionContinuous) -> NodeContinuous:
         return action.child_node
 
     @staticmethod
@@ -351,13 +351,13 @@ class MCTSContinuous(MCTS):
 
     @staticmethod
     def expansion(
-        action: ActionDiscrete, state: np.array, reward: float, terminal: bool
-    ) -> NodeDiscrete:
+        action: ActionContinuous, state: np.array, reward: float, terminal: bool
+    ) -> NodeContinuous:
         node = action.add_child_node(state, reward, terminal)
         return node
 
     @staticmethod
-    def backprop(node: NodeDiscrete, gamma: float):
+    def backprop(node: NodeContinuous, gamma: float) -> None:
         R = node.V
         # loop back-up until root is reached
         while node.parent_action is not None:
