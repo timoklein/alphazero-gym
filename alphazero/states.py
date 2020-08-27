@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+from math import ceil
 from abc import ABC, abstractmethod
 
 
@@ -86,10 +87,11 @@ class NodeContinuous(Node):
         self.child_actions = None
     
     def m_progressive_widening(self, c_pw, kappa):
+        pw_actions = ceil( c_pw*( (self.n + 1)**kappa ) )
         if self.child_actions is None:
-            return c_pw*(self.n**kappa)
+            return pw_actions
         else:
-            return max( c_pw*(self.n**kappa) - self.num_children, 0 )
+            return max( pw_actions - self.num_children, 0 )
 
     @property
     def num_children(self):
