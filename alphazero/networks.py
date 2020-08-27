@@ -7,17 +7,7 @@ from torch.distributions import Normal
 from abc import ABC, abstractmethod
 
 
-class Network(ABC, nn.Module):
-    @abstractmethod
-    def predict_V(self):
-        ...
-
-    @abstractmethod
-    def predict_pi(self):
-        ...
-
-
-class NetworkDiscrete(Network):
+class NetworkDiscrete(nn.Module):
     def __init__(
         self, state_dim: int, action_dim: int, n_hidden_layers: int, n_hidden_units: int
     ) -> None:
@@ -68,7 +58,7 @@ class NetworkDiscrete(Network):
         return pi_hat.detach().cpu().numpy()
 
 
-class NetworkContinuous(Network):
+class NetworkContinuous(nn.Module):
     def __init__(
         self,
         state_dim: int,
@@ -98,13 +88,15 @@ class NetworkContinuous(Network):
 
         self.hidden = nn.Sequential(*layers)
 
-        self.policy_head = nn.Linear(n_hidden_units, self.action_dim)
+        self.mean_head = nn.Linear(n_hidden_units, self.action_dim)
+        self.std_head = nn.Linear(n_hidden_units, self.action_dim)
         self.value_head = nn.Linear(n_hidden_units, 1)
 
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         x = F.elu(self.in_layer(x))
         x = self.hidden(x)
-        mean, log_std = self.policy_head(x)
+        mean = self.mean_head(x)
+        log_std = self.std_head(x)
         V_hat = self.value_head(x)
         return mean, log_std, V_hat
 
@@ -118,16 +110,17 @@ class NetworkContinuous(Network):
         return V_hat.detach().cpu().numpy()
 
     def entropy(self, x: torch.Tensor) -> torch.Tensor:
-        x = F.elu(self.in_layer(x))
-        mean, log_std = self.policy_head(self.hidden(x))
+        mean, log_std, V_hat = self.forward(x)
         log_std = torch.clamp(log_std, min=self.LOG_SIG_MIN, max=self.LOG_SIG_MAX)
         std = log_std.exp()
         normal = Normal(mean, std)
-        return normal.entropy()
+        return normal.entropy(), V_hat
 
     def sample(self, x: torch.Tensor) -> Tuple[np.array, np.array, torch.Tensor]:
         x = F.elu(self.in_layer(x))
-        mean, log_std = self.policy_head(self.hidden(x))
+        x = self.hidden(x)
+        mean = self.mean_head(x)
+        log_std = self.std_head(x)
         log_std = torch.clamp(log_std, min=self.LOG_SIG_MIN, max=self.LOG_SIG_MAX)
         std = log_std.exp()
         normal = Normal(mean, std)
