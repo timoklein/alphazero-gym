@@ -81,25 +81,3 @@ def is_atari_game(env: gym.Env) -> bool:
     env = get_base_env(env)
     return hasattr(env, "ale")
 
-
-### Visualization ##
-def symmetric_remove(x: np.array, n: int) -> np.array:
-    """ removes n items from beginning and end """
-    odd = is_odd(n)
-    half = int(n / 2)
-    if half > 0:
-        x = x[half:-half]
-    if odd:
-        x = x[1:]
-    return x
-
-
-def is_odd(number: int) -> bool:
-    """ checks whether number is odd, returns boolean """
-    return bool(number & 1)
-
-
-def smooth(y: np.array, window: int, mode: str) -> np.array:
-    """ smooth 1D vectory y """
-    return np.convolve(y, np.ones(window) / window, mode=mode)
-
