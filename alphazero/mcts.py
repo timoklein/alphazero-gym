@@ -7,11 +7,15 @@ import torch
 import numpy as np
 from abc import ABC, abstractmethod
 
-from .states import ActionDiscrete, NodeDiscrete
+from .states import ActionDiscrete, NodeContinuous, NodeDiscrete
 from .helpers import copy_atari_state, restore_atari_state, stable_normalizer, argmax
 
 
 class MCTS(ABC):
+    @abstractmethod
+    def selectionUCT(self):
+        ...
+
     @abstractmethod
     def selection(self):
         ...
@@ -35,6 +39,7 @@ class MCTS(ABC):
     @abstractmethod
     def search(self):
         ...
+
 
 class MCTSDiscrete(MCTS):
     """ MCTS object """
@@ -95,7 +100,9 @@ class MCTSDiscrete(MCTS):
         ]
         node.priors = self.model.predict_pi(state).flatten()
 
-    def search(self, n_traces: int, Env: gym.Env, mcts_env: gym.Env, simulation: bool=False):
+    def search(
+        self, n_traces: int, Env: gym.Env, mcts_env: gym.Env, simulation: bool = False
+    ):
         """ Perform the MCTS search from the root """
 
         self.initialize_search()
@@ -152,6 +159,12 @@ class MCTSDiscrete(MCTS):
         winner = argmax(UCT)
         return node.child_actions[winner]
 
+    def expansion(
+        self, action: ActionDiscrete, state: np.array, reward: float, terminal: bool
+    ) -> NodeDiscrete:
+        node = action.add_child_node(state, reward, terminal)
+        return node
+
     @staticmethod
     def selection(action: ActionDiscrete) -> NodeDiscrete:
         return action.child_node
@@ -166,12 +179,6 @@ class MCTSDiscrete(MCTS):
             V += reward
 
         return np.array(V)
-
-    def expansion(
-        self, action: ActionDiscrete, state: np.array, reward: float, terminal: bool
-    ) -> NodeDiscrete:
-        node = action.add_child_node(state, reward, terminal)
-        return node
 
     @staticmethod
     def backprop(node: NodeDiscrete, gamma: float):
@@ -224,6 +231,8 @@ class MCTSContinuous(MCTS):
         model: torch.nn.Module,
         num_actions: int,
         c_uct: float,
+        c_pw: float,
+        kappa: float,
         gamma: float,
         root_state: np.array,
         root=None,
@@ -233,17 +242,14 @@ class MCTSContinuous(MCTS):
         self.model = model
         self.num_actions = num_actions
         self.c_uct = c_uct
+        self.c_pw = c_pw
+        self.kappa = kappa
         self.gamma = gamma
-
 
     def initialize_search(self) -> None:
         if self.root_node is None:
-            self.root_node = NodeDiscrete(
-                self.root_state,
-                r=0.0,
-                terminal=False,
-                parent_action=None,
-                num_actions=self.num_actions,
+            self.root_node = NodeContinuous(
+                self.root_state, r=0.0, terminal=False, parent_action=None,
             )
         else:
             # continue from current root
@@ -251,7 +257,7 @@ class MCTSContinuous(MCTS):
         if self.root_node.terminal:
             raise ValueError("Can't do tree search from a terminal node")
 
-    def evaluation(self, node: NodeDiscrete, V: float = None) -> None:
+    def evaluation(self, node: NodeContinuous, V: float = None) -> None:
         state = torch.from_numpy(node.state[None,]).float()
 
         # only use the neural network to estimate the value if we have none
@@ -267,9 +273,11 @@ class MCTSContinuous(MCTS):
             ActionDiscrete(a, parent_node=node, Q_init=node.V)
             for a in range(node.num_actions)
         ]
-        node.priors = self.model.predict_pi(state).flatten()
+        node.prior = self.model.predict_pi(state).flatten()
 
-    def search(self, n_traces: int, Env: gym.Env, mcts_env: gym.Env, simulation: bool=False):
+    def search(
+        self, n_traces: int, Env: gym.Env, mcts_env: gym.Env, simulation: bool = False
+    ):
         """ Perform the MCTS search from the root """
 
         self.initialize_search()
@@ -317,7 +325,7 @@ class MCTSContinuous(MCTS):
             [
                 child_action.Q
                 + prior * c_uct * (np.sqrt(node.n + 1) / (child_action.n + 1))
-                for child_action, prior in zip(node.child_actions, node.priors)
+                for child_action, prior in zip(node.child_actions, node.prior)
             ]
         )
         winner = argmax(UCT)
@@ -355,13 +363,15 @@ class MCTSContinuous(MCTS):
             node = action.parent_node
             node.update_visit_counts()
 
-    def return_results(self, temperature: float) -> Tuple[np.array, np.array, np.array]:
+    def return_results(self) -> Tuple[np.array, np.array, np.array]:
         """ Process the output at the root node """
         counts = np.array(
             [child_action.n for child_action in self.root_node.child_actions]
         )
         Q = np.array([child_action.Q for child_action in self.root_node.child_actions])
+        # TODO: Pi target doesn't use this function
         pi_target = stable_normalizer(counts, temperature)
+        # TODO: Adapt this to off policy value estimate
         V_target = np.sum((counts / np.sum(counts)) * Q)[None]
         return self.root_node.state, pi_target, V_target
 
