@@ -117,6 +117,14 @@ class NetworkContinuous(Network):
         self.train()
         return V_hat.detach().cpu().numpy()
 
+    def entropy(self, x: torch.Tensor) -> torch.Tensor:
+        x = F.elu(self.in_layer(x))
+        mean, log_std = self.policy_head(self.hidden(x))
+        log_std = torch.clamp(log_std, min=self.LOG_SIG_MIN, max=self.LOG_SIG_MAX)
+        std = log_std.exp()
+        normal = Normal(mean, std)
+        return normal.entropy()
+
     def sample(self, x: torch.Tensor) -> Tuple[np.array, np.array, torch.Tensor]:
         x = F.elu(self.in_layer(x))
         mean, log_std = self.policy_head(self.hidden(x))
