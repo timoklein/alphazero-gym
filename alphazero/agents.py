@@ -11,15 +11,16 @@ from abc import ABC, abstractmethod
 from torch.optim.rmsprop import RMSprop
 
 from .networks import NetworkContinuous, NetworkDiscrete
-from .mcts import MCTSDiscrete
+from .mcts import MCTSContinuous, MCTSDiscrete
 from .helpers import is_atari_game, check_space
 from .buffers import ReplayBuffer
+
 
 class Agent(ABC):
     @abstractmethod
     def act(self):
         ...
-    
+
     @abstractmethod
     def calculate_loss(self):
         ...
@@ -40,7 +41,9 @@ class Agent(ABC):
     def save_checkpoint(self):
         ...
 
+
 # TODO: Put run method from main into the agent?
+
 
 class AlphaZeroAgent(Agent):
     def __init__(
@@ -197,6 +200,7 @@ class AlphaZeroAgent(Agent):
             model_path,
         )
 
+
 class A0CAgent(Agent):
     def __init__(
         self,
@@ -206,8 +210,11 @@ class A0CAgent(Agent):
         value_loss_ratio: float,
         n_traces: int,
         lr: float,
-        temperature: float,
         c_uct: float,
+        c_pw: float,
+        kappa: float,
+        tau: float,
+        alpha: float,
         gamma: float,
     ) -> None:
         # get info about the environment
@@ -219,15 +226,18 @@ class A0CAgent(Agent):
         # initialize values
         self.n_traces = n_traces
         self.c_uct = c_uct
+        self.c_pw = c_pw
+        self.kappa = kappa
+        self.tau = tau
+        self.alpha = alpha
         self.gamma = gamma
         self.lr = lr
-        self.temperature = temperature
         self.value_loss_ratio = value_loss_ratio
 
         # action_dim*2 -> Needs both location and scale for one dimension
         self.nn = NetworkContinuous(
             self.state_dim,
-            self.action_dim*2,
+            self.action_dim * 2,
             n_hidden_layers=n_hidden_layers,
             n_hidden_units=n_hidden_units,
         )
@@ -244,11 +254,13 @@ class A0CAgent(Agent):
         return self.nn.n_hidden_units
 
     def reset_mcts(self, root_state: np.array) -> None:
-        self.mcts = MCTSDiscrete(
+        self.mcts = MCTSContinuous(
             model=self.nn,
             num_actions=self.nn.action_dim,
             gamma=self.gamma,
             c_uct=self.c_uct,
+            c_pw=self.c_pw,
+            kappa=self.kappa,
             root_state=root_state,
         )
 
@@ -256,8 +268,10 @@ class A0CAgent(Agent):
     def act(
         self, Env: gym.Env, mcts_env: gym.Env, deterministic: bool = False
     ) -> Tuple[int, np.array, np.array, np.array]:
-        self.mcts.search(n_traces=self.n_traces, Env=Env, mcts_env=mcts_env, simulation=False)
-        state, pi, V = self.mcts.return_results(self.temperature)
+        self.mcts.search(
+            n_traces=self.n_traces, Env=Env, mcts_env=mcts_env, simulation=False
+        )
+        state, pi, V = self.mcts.return_results()
         # sample an action from the policy or pick best action if deterministic
         action = pi.argmax() if deterministic else np.random.choice(len(pi), p=pi)
         return action, state, pi, V
