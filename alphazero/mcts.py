@@ -159,8 +159,9 @@ class MCTSDiscrete(MCTS):
         winner = argmax(UCT)
         return node.child_actions[winner]
 
+    @staticmethod
     def expansion(
-        self, action: ActionDiscrete, state: np.array, reward: float, terminal: bool
+        action: ActionDiscrete, state: np.array, reward: float, terminal: bool
     ) -> NodeDiscrete:
         node = action.add_child_node(state, reward, terminal)
         return node
@@ -269,11 +270,14 @@ class MCTSContinuous(MCTS):
             )
         else:
             node.V = V
+
+        # add all actions allowed through progressive widening at once
+        num_pw_actions = node.m_progressive_widening(self.c_pw, self.kappa)
+        actions, log_probs, _ = self.model.sample(state.repeat(num_pw_actions, 1))
         node.child_actions = [
-            ActionDiscrete(a, parent_node=node, Q_init=node.V)
-            for a in range(node.num_actions)
+            ActionDiscrete(a, lp, parent_node=node, Q_init=node.V)
+            for a, lp in zip(actions, log_probs)
         ]
-        node.prior = self.model.predict_pi(state).flatten()
 
     def search(
         self, n_traces: int, Env: gym.Env, mcts_env: gym.Env, simulation: bool = False
@@ -323,9 +327,8 @@ class MCTSContinuous(MCTS):
         """ Select one of the child actions based on UCT rule """
         UCT = np.array(
             [
-                child_action.Q
-                + prior * c_uct * (np.sqrt(node.n + 1) / (child_action.n + 1))
-                for child_action, prior in zip(node.child_actions, node.prior)
+                child_action.Q + c_uct * (np.sqrt(node.n + 1) / (child_action.n + 1))
+                for child_action in node.child_actions
             ]
         )
         winner = argmax(UCT)
@@ -346,8 +349,9 @@ class MCTSContinuous(MCTS):
 
         return np.array(V)
 
+    @staticmethod
     def expansion(
-        self, action: ActionDiscrete, state: np.array, reward: float, terminal: bool
+        action: ActionDiscrete, state: np.array, reward: float, terminal: bool
     ) -> NodeDiscrete:
         node = action.add_child_node(state, reward, terminal)
         return node
@@ -363,18 +367,20 @@ class MCTSContinuous(MCTS):
             node = action.parent_node
             node.update_visit_counts()
 
-    def return_results(self) -> Tuple[np.array, np.array, np.array]:
+    def return_results(self) -> Tuple[np.array, np.array, np.array, np.array]:
         """ Process the output at the root node """
+        log_probs = np.array(
+            [child_action.log_prob for child_action in self.root_node.child_actions]
+        )
         counts = np.array(
             [child_action.n for child_action in self.root_node.child_actions]
         )
+        log_counts = np.log(counts)
         Q = np.array([child_action.Q for child_action in self.root_node.child_actions])
-        # TODO: Pi target doesn't use this function
-        pi_target = stable_normalizer(counts, temperature)
-        # TODO: Adapt this to off policy value estimate
-        V_target = np.sum((counts / np.sum(counts)) * Q)[None]
-        return self.root_node.state, pi_target, V_target
+        V_target = Q.max()
+        return self.root_node.state, log_probs, log_counts, V_target
 
+    # TODO: Can we really use this in continuous action spaces? Tree reuse
     def forward(self, action: int, state: np.array) -> None:
         """ Move the root forward """
         if not hasattr(self.root_node.child_actions[action], "child_node"):

@@ -84,6 +84,12 @@ class NodeContinuous(Node):
 
         # Child actions
         self.child_actions = None
+    
+    def m_progressive_widening(self, c_pw, kappa):
+        if self.child_actions is None:
+            return c_pw*(self.n**kappa)
+        else:
+            return max( c_pw*(self.n**kappa) - self.num_children, 0 )
 
     @property
     def num_children(self):
@@ -121,8 +127,11 @@ class ActionDiscrete(Action):
 class ActionContinuous(Action):
     """ Action object """
 
-    def __init__(self, action_value: float, parent_node: NodeContinuous, Q_init: float):
-        self.action_value = action_value
+    __slots__ = "log_prob"
+
+    def __init__(self, action: np.array, log_prob: torch.Tensor, parent_node: NodeContinuous, Q_init: float):
+        self.action = action
+        self.log_prob = log_prob
         self.parent_node = parent_node
         self.W = 0.0
         self.n = 0
@@ -133,7 +142,7 @@ class ActionContinuous(Action):
     def add_child_node(
         self, state: np.array, r: float, terminal: bool
     ) -> NodeContinuous:
-        self.child_node = NodeDiscrete(state, r, terminal, self, 0)
+        self.child_node = NodeContinuous(state, r, terminal, self)
         return self.child_node
 
     def update(self, R: float) -> None:
