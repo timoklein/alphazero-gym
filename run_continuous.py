@@ -1,24 +1,27 @@
 import numpy as np
 from tqdm import trange
 import argparse
-import os
 import time
 import git
 import wandb
 
 from alphazero.agents import AlphaZeroAgent
 from alphazero.buffers import ReplayBuffer
-from alphazero.helpers import is_atari_game, store_safely
+from alphazero.helpers import is_atari_game
 from rl.make_game import make_game
 
-
+# TODO: Add params for continuous run
 def run_discrete_agent(
     game: str,
     n_ep: int,
     n_traces: int,
     max_ep_len: int,
     lr: float,
-    c: float,
+    c_uct: float,
+    c_pw: float,
+    kappa: float,
+    tau: float,
+    alpha: float,
     gamma: float,
     buffer_size: int,
     batch_size: int,
@@ -47,7 +50,11 @@ def run_discrete_agent(
         n_traces=n_traces,
         lr=lr,
         temperature=temp,
-        c_uct=c,
+        c_uct=c_uct,
+        c_pw=c_pw,
+        kappa=kappa,
+        tau=tau,
+        alpha=tau,
         gamma=gamma,
     )
 
@@ -139,7 +146,11 @@ if __name__ == "__main__":
         help="Maximum number of steps per episode",
     )
     parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
-    parser.add_argument("--c", type=float, default=1.5, help="UCT constant")
+    parser.add_argument("--c_uct", type=float, default=0.05, help="UCT constant")
+    parser.add_argument("--c_pw", type=float, default=1, help="Progressive widening constant")
+    parser.add_argument("--kappa", type=float, default=0.5, help="Progressive widening exponent")
+    parser.add_argument("--tau", type=float, default=0.1, help="Log visit counts scaling factor")
+    parser.add_argument("--alpha", type=float, default=0.1, help="Entropy temperature parameter")
     parser.add_argument(
         "--temp",
         type=float,
@@ -180,7 +191,7 @@ if __name__ == "__main__":
         n_traces=args.n_traces,
         max_ep_len=args.max_ep_len,
         lr=args.lr,
-        c=args.c,
+        c_uct=args.c_uct,
         gamma=args.gamma,
         buffer_size=args.buffer_size,
         batch_size=args.batch_size,
