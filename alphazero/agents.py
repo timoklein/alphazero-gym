@@ -12,7 +12,7 @@ from torch.optim.rmsprop import RMSprop
 
 from .networks import NetworkContinuous, NetworkDiscrete
 from .mcts import MCTSContinuous, MCTSDiscrete
-from .helpers import is_atari_game, check_space
+from .helpers import is_atari_game, check_space, stable_normalizer
 from .buffers import ReplayBuffer
 
 
@@ -40,9 +40,6 @@ class Agent(ABC):
     @abstractmethod
     def save_checkpoint(self):
         ...
-
-
-# TODO: Put run method from main into the agent?
 
 
 class AlphaZeroAgent(Agent):
@@ -114,15 +111,19 @@ class AlphaZeroAgent(Agent):
         self.mcts.forward(action, node)
 
     def calculate_loss(
-        self, pi_logits: torch.Tensor, V_hat: torch.tensor, V, pi: torch.Tensor
+        self,
+        pi_logits: torch.Tensor,
+        V_hat: torch.tensor,
+        V: torch.Tensor,
+        pi: torch.Tensor,
     ) -> Dict[str, torch.Tensor]:
         # calculate policy loss from model logits
         # first we have to convert the probabilities to labels
         pi = pi.argmax(dim=1)
         pi_loss = F.cross_entropy(pi_logits, pi)
         # value loss
-        v_loss = F.mse_loss(V_hat, V)
-        loss = pi_loss + self.value_loss_ratio * v_loss
+        v_loss = self.value_loss_ratio * F.mse_loss(V_hat, V)
+        loss = pi_loss + v_loss
         return {"loss": loss, "policy_loss": pi_loss, "value_loss": v_loss}
 
     def update(self, obs: Tuple[np.array, np.array, np.array]) -> Dict[str, float]:
@@ -210,6 +211,7 @@ class A0CAgent(Agent):
         value_loss_ratio: float,
         n_traces: int,
         lr: float,
+        temperature: float,
         c_uct: float,
         c_pw: float,
         kappa: float,
@@ -232,12 +234,13 @@ class A0CAgent(Agent):
         self.alpha = alpha
         self.gamma = gamma
         self.lr = lr
+        self.temperature = temperature
         self.value_loss_ratio = value_loss_ratio
 
         # action_dim*2 -> Needs both location and scale for one dimension
         self.nn = NetworkContinuous(
-            self.state_dim,
-            self.action_dim * 2,
+            state_dim=self.state_dim,
+            action_dim=self.action_dim,
             n_hidden_layers=n_hidden_layers,
             n_hidden_units=n_hidden_units,
         )
@@ -264,59 +267,92 @@ class A0CAgent(Agent):
             root_state=root_state,
         )
 
-    # TODO: Adapt this to A0C
     def act(
         self, Env: gym.Env, mcts_env: gym.Env, deterministic: bool = False
     ) -> Tuple[int, np.array, np.array, np.array]:
         self.mcts.search(
             n_traces=self.n_traces, Env=Env, mcts_env=mcts_env, simulation=False
         )
-        state, pi, V = self.mcts.return_results()
+        state, log_probs, log_counts, V_target = self.mcts.return_results()
         # sample an action from the policy or pick best action if deterministic
-        action = pi.argmax() if deterministic else np.random.choice(len(pi), p=pi)
-        return action, state, pi, V
+        pi = stable_normalizer(log_counts, self.temperature)
+        # if deterministic else np.random.choice(len(pi), p=pi)
+        action = pi.max()
+        return action, state, log_probs, log_counts, V_target
 
     # TODO: Implement A0C loss
-    def calculate_loss(
-        self, pi_logits: torch.Tensor, V_hat: torch.tensor, V, pi: torch.Tensor
-    ) -> Dict[str, torch.Tensor]:
-        # calculate policy loss from model logits
-        # first we have to convert the probabilities to labels
-        pi = pi.argmax(dim=1)
-        pi_loss = F.cross_entropy(pi_logits, pi)
-        # value loss
-        v_loss = F.mse_loss(V_hat, V)
-        loss = pi_loss + self.value_loss_ratio * v_loss
-        return {"loss": loss, "policy_loss": pi_loss, "value_loss": v_loss}
+    def _calculate_policy_loss(
+        self, log_probs: torch.Tensor, log_counts: torch.Tensor, reduction: str = "mean"
+    ) -> torch.Tensor:
 
-    def update(self, obs: Tuple[np.array, np.array, np.array]) -> Dict[str, float]:
+        with torch.no_grad():
+            # calculate scaling term
+            log_diff = log_probs - self.tau*log_counts
+        
+        import ipdb; ipdb.set_trace(context=10)
+
+        policy_loss = torch.einsum("ni, nj -> n", log_diff, log_probs)
+        # multiple with log_probs gradient
+
+        if reduction == "mean":
+            return policy_loss
+        else:
+            pass
+
+    def calculate_loss(
+        self,
+        log_probs: torch.Tensor,
+        log_counts: torch.tensor,
+        entropy: torch.Tensor,
+        V: torch.Tensor,
+        V_hat: torch.Tensor,
+    ) -> Dict[str, torch.Tensor]:
+
+        policy_loss = self._calculate_policy_loss(
+            log_probs, log_counts, reduction="mean"
+        )
+        entropy_loss = -self.alpha * entropy
+        value_loss = self.value_loss_ratio * F.mse_loss(V_hat, V, reduction="mean")
+        loss = policy_loss + entropy_loss + value_loss
+        return {
+            "loss": loss,
+            "policy_loss": policy_loss,
+            "entropy_loss": entropy_loss,
+            "value_loss": value_loss,
+        }
+
+    def update(
+        self, obs: Tuple[np.array, torch.Tensor, np.array, np.array]
+    ) -> Dict[str, float]:
         self.optimizer.zero_grad()
 
-        state_batch, V_batch, pi_batch = obs
-        states_tensor = torch.from_numpy(state_batch).float()
-        values_tensor = torch.from_numpy(V_batch).float()
-        action_probs_tensor = torch.from_numpy(pi_batch).float()
+        states, log_probs, log_counts, V_target = obs
+        states_tensor = torch.from_numpy(states).float()
+        log_counts_tensor = torch.from_numpy(log_counts).float()
+        values_tensor = torch.from_numpy(V_target).float()
+        entropy, V_hat = self.nn.entropy(states_tensor)
 
-        pi_logits, V_hat = self.nn(states_tensor)
         loss_dict = self.calculate_loss(
-            pi_logits, V_hat, values_tensor, action_probs_tensor
+            log_probs, log_counts_tensor, values_tensor, entropy, V_hat
         )
         loss_dict["loss"].backward()
         self.optimizer.step()
 
         loss_dict["loss"] = loss_dict["loss"].detach().item()
         loss_dict["policy_loss"] = loss_dict["policy_loss"].detach().item()
+        loss_dict["entropy_loss"] = loss_dict["policy_loss"].detach().item()
         loss_dict["value_loss"] = loss_dict["value_loss"].detach().item()
         return loss_dict
 
     def train(self, buffer: ReplayBuffer) -> float:
         buffer.reshuffle()
-        running_loss = {"loss": 0, "policy_loss": 0, "value_loss": 0}
+        running_loss = {"loss": 0, "policy_loss": 0, "entropy_loss": 0, "value_loss": 0}
         for epoch in range(1):
             for batches, obs in enumerate(buffer):
                 loss = self.update(obs)
                 running_loss["loss"] += loss["loss"]
                 running_loss["policy_loss"] += loss["policy_loss"]
+                running_loss["entropy_loss"] += loss["entropy_loss"]
                 running_loss["value_loss"] += loss["value_loss"]
         for val in running_loss.values():
             val /= batches + 1
