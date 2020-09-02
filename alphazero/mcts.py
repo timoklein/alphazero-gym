@@ -27,10 +27,6 @@ class MCTS(ABC):
         ...
 
     @abstractmethod
-    def evaluation(self):
-        ...
-
-    @abstractmethod
     def simulation(self):
         ...
 
@@ -84,6 +80,7 @@ class MCTSDiscrete(MCTS):
         if self.is_atari:
             snapshot = copy_atari_state(Env)
 
+    # TODO: Split evaluation and prior adding?
     def evaluation(self, node: NodeDiscrete, V: float = None) -> None:
         state = torch.from_numpy(node.state[None,]).float()
 
@@ -261,26 +258,22 @@ class MCTSContinuous(MCTS):
         if self.root_node.terminal:
             raise ValueError("Can't do tree search from a terminal node")
 
-    def evaluation(self, node: NodeContinuous, V: float = None) -> None:
-        state = torch.from_numpy(node.state[None,]).float()
-        action, log_prob, V_hat = self.model(state)
-
-        # only use the neural network to estimate the value if we have none
-        if not V:
-            node.V = (
-                np.squeeze(self.model.predict_V(state))
-                if not node.terminal
-                else np.array(0.0)
-            )
+    def add_value_estimate(self, node: NodeContinuous, mcts_env: gym.Env = None):
+        if mcts_env:
+            node.V = self.simulation(mcts_env)
         else:
-            node.V = V
-        
-        node.V_hat = V_hat
+            state = torch.from_numpy(node.state[None,]).float()
+            node.V = (
+                    np.squeeze(self.model.predict_V(state))
+                    if not node.terminal
+                    else np.array(0.0)
+                )
 
-        # add all actions allowed through progressive widening at once
-        if node.check_pw(self.c_pw, self.kappa) and not node.terminal:
-            new_child = ActionContinuous(action, log_prob, parent_node=node, Q_init=node.V)
-            node.child_actions.append(new_child)
+    def add_pw_action(self, node: NodeContinuous) -> None:
+        state = torch.from_numpy(node.state[None,]).float()
+        action, log_prob, _ = self.model(state)
+        new_child = ActionContinuous(action, log_prob, parent_node=node, Q_init=node.V)
+        node.child_actions.append(new_child)
 
     def search(
         self, n_traces: int, Env: gym.Env, mcts_env: gym.Env, simulation: bool = False
@@ -290,10 +283,12 @@ class MCTSContinuous(MCTS):
         self.initialize_search()
         if simulation:
             mcts_env = copy.deepcopy(Env)
-            V = self.simulation(mcts_env)
-            self.evaluation(self.root_node, V)
+            self.add_value_estimate(self.root_node, mcts_env)
+            self.add_pw_action(self.root_node)
         else:
-            self.evaluation(self.root_node)
+            self.add_value_estimate(self.root_node)
+            self.add_pw_action(self.root_node)
+        
 
         for i in range(n_traces):
             # reset to root for new trace
@@ -303,7 +298,7 @@ class MCTSContinuous(MCTS):
             mcts_env = copy.deepcopy(Env)
 
             while not node.terminal:
-                action = self.selectionUCT(i, node)
+                action = self.selectionUCT(node)
 
                 # take step
                 new_state, reward, terminal, _ = mcts_env.step(action.action)
@@ -315,21 +310,18 @@ class MCTSContinuous(MCTS):
                     # expansion
                     node = self.expansion(action, np.squeeze(new_state), reward, terminal)
 
-                    # Evaluate node -> Perform simulation if not already in a terminal state
                     if not terminal and simulation:
-                        V = self.simulation(mcts_env)
-                        self.evaluation(node, V)
+                        self.add_value_estimate(node, mcts_env)
                     else:
-                        self.evaluation(node)
+                        self.add_value_estimate(node)
                     break
 
             self.backprop(node, self.gamma)
 
-    def selectionUCT(self,i, node: NodeContinuous) -> ActionContinuous:
+    def selectionUCT(self,node: NodeContinuous) -> ActionContinuous:
         """ Select one of the child actions based on UCT rule """
-
         if node.check_pw(self.c_pw, self.kappa):
-            self.evaluation(node)
+            self.add_pw_action(node)
             return node.child_actions[-1]
         else:
             UCT = np.array(

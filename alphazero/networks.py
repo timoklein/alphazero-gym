@@ -96,32 +96,36 @@ class NetworkContinuous(nn.Module):
         self.value_head = nn.Linear(n_hidden_units, 1)
 
     def forward(self, x: torch.Tensor, deterministic: bool = False) -> Tuple[torch.Tensor, torch.Tensor]:
-        x = F.elu(self.in_layer(x))
-        x = self.hidden(x)
-        mean = self.mean_head(x)
-        log_std = self.std_head(x)
-        V_hat = self.value_head(x)
+        with torch.autograd.set_detect_anomaly(True):
+            x = F.elu(self.in_layer(x))
+            x = self.hidden(x)
+            mean = self.mean_head(x)
+            log_std = self.std_head(x)
+            V_hat = self.value_head(x)
 
-        # Trick from OpenAI spinning up to scale log standard deviation
-        log_std = torch.clamp(log_std, self.LOG_STD_MIN, self.LOG_STD_MAX)
+            # Trick from OpenAI spinning up to scale log standard deviation
+            log_std = torch.clamp(log_std, self.LOG_STD_MIN, self.LOG_STD_MAX)
 
-        std = log_std.exp()
-        normal = Normal(mean, std)
+            std = log_std.exp()
+            normal = Normal(mean, std)
 
-        # Enable deterministic action if in eval mode
-        if deterministic:
-            action = mean
-        else:
-            # reparameterization trick (mean + std * N(0,1))
-            action = normal.rsample()
+            # Enable deterministic action if in eval mode
+            if deterministic:
+                action = mean
+            else:
+                # reparameterization trick (mean + std * N(0,1))
+                action = normal.rsample()
 
-        # Enforcing Action Bound
-        # This is the correction for squashing the log std and the actions
-        log_prob = normal.log_prob(action).sum(axis=-1)
-        log_prob -= (2 * (np.log(2) - action - F.softplus(-2 * action))).sum(axis=1)
-        action = torch.tanh(action)
-        action = self.act_limit * action
-        return action.detach().cpu().numpy(), log_prob, V_hat
+            # Enforcing Action Bound
+            # This is the correction for squashing the log std and the actions
+            log_prob = normal.log_prob(action).sum(axis=-1)
+            log_prob -= (2 * (np.log(2) - action - F.softplus(-2 * action))).sum(axis=1)
+            action = torch.tanh(action)
+            action = self.act_limit * action
+            return action.detach().cpu().numpy(), log_prob, V_hat
+
+    # TODO: Implement act method
+    # TODO: Implement method to generate log_probs and V_hat from actions and state
 
     @torch.no_grad()
     def predict_V(self, x: torch.Tensor) -> np.array:

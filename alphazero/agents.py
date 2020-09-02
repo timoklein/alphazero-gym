@@ -1,3 +1,4 @@
+from numpy.lib.ufunclike import isposinf
 import torch
 import torch.nn.functional as F
 from torch import optim
@@ -333,15 +334,19 @@ class A0CAgent(Agent):
     ) -> Dict[str, float]:
         self.optimizer.zero_grad()
 
-        _, log_probs, log_counts, V_hat, V_target = obs
+        states, log_probs, log_counts, V_hat, V_target = obs
+        states_tensor = torch.from_numpy(states).float()
         log_counts_tensor = torch.from_numpy(log_counts).float()
         values_tensor = torch.from_numpy(V_target).float()
+        # TODO: Implement this using only actions and states as input
+        _, _, V_hat = self.nn(states_tensor)
 
         loss_dict = self.calculate_loss(
             log_probs, log_counts_tensor, values_tensor, V_hat
         )
-        loss_dict["loss"].backward()
-        self.optimizer.step()
+        with torch.autograd.set_detect_anomaly(True):
+            loss_dict["loss"].backward()
+            self.optimizer.step()
 
         loss_dict["loss"] = loss_dict["loss"].detach().item()
         loss_dict["policy_loss"] = loss_dict["policy_loss"].detach().item()

@@ -10,7 +10,6 @@ from alphazero.buffers import ReplayBuffer
 from alphazero.helpers import is_atari_game
 from rl.make_game import make_game
 
-# TODO: Add params for continuous run
 def run_continuous_agent(
     game: str,
     n_ep: int,
