@@ -68,6 +68,8 @@ class NodeDiscrete(Node):
 class NodeContinuous(Node):
     """ Node object """
 
+    __slots__ = "V_hat"
+
     def __init__(
         self,
         state: np.array,
@@ -82,6 +84,7 @@ class NodeContinuous(Node):
         self.parent_action = parent_action
         self.n = 0
         self.V = None
+        self.V_hat = None
 
         # Child actions
         self.child_actions = []

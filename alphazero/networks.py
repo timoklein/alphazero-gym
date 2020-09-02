@@ -90,21 +90,38 @@ class NetworkContinuous(nn.Module):
         self.in_layer = nn.Linear(self.state_dim, n_hidden_units)
 
         self.hidden = nn.Sequential(*layers)
-        
+
         self.mean_head = nn.Linear(n_hidden_units, self.action_dim)
         self.std_head = nn.Linear(n_hidden_units, self.action_dim)
         self.value_head = nn.Linear(n_hidden_units, 1)
 
-    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, x: torch.Tensor, deterministic: bool = False) -> Tuple[torch.Tensor, torch.Tensor]:
         x = F.elu(self.in_layer(x))
         x = self.hidden(x)
         mean = self.mean_head(x)
         log_std = self.std_head(x)
+        V_hat = self.value_head(x)
+
         # Trick from OpenAI spinning up to scale log standard deviation
         log_std = torch.clamp(log_std, self.LOG_STD_MIN, self.LOG_STD_MAX)
 
-        V_hat = self.value_head(x)
-        return mean, log_std, V_hat
+        std = log_std.exp()
+        normal = Normal(mean, std)
+
+        # Enable deterministic action if in eval mode
+        if deterministic:
+            action = mean
+        else:
+            # reparameterization trick (mean + std * N(0,1))
+            action = normal.rsample()
+
+        # Enforcing Action Bound
+        # This is the correction for squashing the log std and the actions
+        log_prob = normal.log_prob(action).sum(axis=-1)
+        log_prob -= (2 * (np.log(2) - action - F.softplus(-2 * action))).sum(axis=1)
+        action = torch.tanh(action)
+        action = self.act_limit * action
+        return action.detach().cpu().numpy(), log_prob, V_hat
 
     @torch.no_grad()
     def predict_V(self, x: torch.Tensor) -> np.array:
@@ -114,23 +131,4 @@ class NetworkContinuous(nn.Module):
         V_hat = self.value_head(x)
         self.train()
         return V_hat.detach().cpu().numpy()
-
-    def sample(self, x: torch.Tensor, deterministic: bool = False) -> Tuple[np.array, np.array, torch.Tensor, torch.Tensor]:
-        mean, log_std, V_hat = self.forward(x)
-        std = log_std.exp()
-        normal = Normal(mean, std)
-
-        # Enable deterministic action if in eval mode
-        if deterministic:
-            action = mean
-        else:
-            # eparameterization trick (mean + std * N(0,1))
-            action = normal.sample()
         
-        # Enforcing Action Bound
-        # This is the correction for squashing the log std and the actions
-        log_prob = normal.log_prob(action).sum(axis=-1)
-        log_prob -= (2*(np.log(2) - action - F.softplus(-2*action))).sum(axis=1)
-        action = torch.tanh(action)
-        action = self.act_limit * action
-        return action.detach().cpu().numpy(), log_prob, V_hat

@@ -263,7 +263,7 @@ class MCTSContinuous(MCTS):
 
     def evaluation(self, node: NodeContinuous, V: float = None) -> None:
         state = torch.from_numpy(node.state[None,]).float()
-        action, log_prob, V_hat = self.model.sample(state)
+        action, log_prob, V_hat = self.model(state)
 
         # only use the neural network to estimate the value if we have none
         if not V:
@@ -274,6 +274,8 @@ class MCTSContinuous(MCTS):
             )
         else:
             node.V = V
+        
+        node.V_hat = V_hat
 
         # add all actions allowed through progressive widening at once
         if node.check_pw(self.c_pw, self.kappa) and not node.terminal:
@@ -384,7 +386,8 @@ class MCTSContinuous(MCTS):
         log_counts = np.log(counts)
         Q = np.array([child_action.Q for child_action in self.root_node.child_actions])
         V_target = Q.max()
-        return self.root_node.state, actions.squeeze(), log_probs.squeeze(), log_counts, V_target
+        V_hat = self.root_node.V_hat
+        return self.root_node.state, actions.squeeze(), log_probs.squeeze(), log_counts, V_hat, V_target
 
     # TODO: Can we really use this in continuous action spaces? Tree reuse
     def forward(self, action: int, state: np.array) -> None:

@@ -241,8 +241,7 @@ class A0CAgent(Agent):
         self.nn = NetworkContinuous(
             state_dim=self.state_dim,
             action_dim=self.action_dim,
-            action_space_low=Env.action_space.low,
-            action_space_high=Env.action_space.high,
+            act_limit=Env.action_space.high[0],
             n_hidden_layers=n_hidden_layers,
             n_hidden_units=n_hidden_units,
         )
@@ -275,14 +274,14 @@ class A0CAgent(Agent):
         self.mcts.search(
             n_traces=self.n_traces, Env=Env, mcts_env=mcts_env, simulation=False
         )
-        state, actions, log_probs, log_counts, V_target = self.mcts.return_results()
+        state, actions, log_probs, log_counts, V_hat, V_target = self.mcts.return_results()
         if deterministic:
             action = actions[log_counts.argmax()]
         else:
             pi = stable_normalizer(log_counts, self.temperature)
             action = np.random.choice(actions, size=(1,), p=pi)
 
-        return action, state, log_probs, log_counts, V_target
+        return action, state, log_probs, log_counts, V_hat, V_target
 
     def _calculate_policy_loss(
         self, log_probs: torch.Tensor, log_counts: torch.Tensor, reduction: str = "mean"
@@ -334,11 +333,9 @@ class A0CAgent(Agent):
     ) -> Dict[str, float]:
         self.optimizer.zero_grad()
 
-        states, log_probs, log_counts, V_target = obs
-        states_tensor = torch.from_numpy(states).float()
+        _, log_probs, log_counts, V_hat, V_target = obs
         log_counts_tensor = torch.from_numpy(log_counts).float()
         values_tensor = torch.from_numpy(V_target).float()
-        _, _, V_hat = self.nn(states_tensor)
 
         loss_dict = self.calculate_loss(
             log_probs, log_counts_tensor, values_tensor, V_hat

@@ -92,8 +92,8 @@ def run_continuous_agent(
         for t in range(max_ep_len):
             # MCTS step
             # run mcts and extract the root output
-            action, s, log_probs, log_counts, V = agent.act(Env=Env, mcts_env=mcts_env)
-            buffer.store((s, log_probs, log_counts, V))
+            action, s, log_probs, log_counts, V_hat, V = agent.act(Env=Env, mcts_env=mcts_env)
+            buffer.store((s, log_probs, log_counts, V_hat, V))
 
             # Make the true step
             state , step_reward, terminal, _ = Env.step(action)
