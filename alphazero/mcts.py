@@ -94,11 +94,13 @@ class MCTSDiscrete(MCTS):
             )
         else:
             node.V = V
-        node.child_actions = [
-            ActionDiscrete(a, parent_node=node, Q_init=node.V)
-            for a in range(node.num_actions)
-        ]
-        node.priors = self.model.predict_pi(state).flatten()
+        
+        if not node.terminal:
+            node.child_actions = [
+                ActionDiscrete(a, parent_node=node, Q_init=node.V)
+                for a in range(node.num_actions)
+            ]
+            node.priors = self.model.predict_pi(state).flatten()
 
     def search(
         self, n_traces: int, Env: gym.Env, mcts_env: gym.Env, simulation: bool = False
@@ -223,7 +225,6 @@ class MCTSDiscrete(MCTS):
             self.root_node = self.root_node.child_actions[action].child_node
 
 
-# TODO: Implement continuous MCTS
 class MCTSContinuous(MCTS):
     """ MCTS object """
 
@@ -272,12 +273,10 @@ class MCTSContinuous(MCTS):
             node.V = V
 
         # add all actions allowed through progressive widening at once
-        num_pw_actions = node.m_progressive_widening(self.c_pw, self.kappa)
-        actions, log_probs, _ = self.model.sample(state.repeat(num_pw_actions, 1))
-        node.child_actions = [
-            ActionContinuous(a, lp, parent_node=node, Q_init=node.V)
-            for a, lp in zip(actions, log_probs)
-        ]
+        if node.check_pw(self.c_pw, self.kappa) and not node.terminal:
+            action, log_prob, _ = self.model.sample(state)
+            new_child = ActionContinuous(action, log_prob, parent_node=node, Q_init=node.V)
+            node.child_actions.append(new_child)
 
     def search(
         self, n_traces: int, Env: gym.Env, mcts_env: gym.Env, simulation: bool = False
@@ -300,7 +299,7 @@ class MCTSContinuous(MCTS):
             mcts_env = copy.deepcopy(Env)
 
             while not node.terminal:
-                action = self.selectionUCT(self.c_uct, node)
+                action = self.selectionUCT(i, node)
 
                 # take step
                 new_state, reward, terminal, _ = mcts_env.step(action.action)
@@ -310,7 +309,7 @@ class MCTSContinuous(MCTS):
                     continue
                 else:
                     # expansion
-                    node = self.expansion(action, new_state, reward, terminal)
+                    node = self.expansion(action, np.squeeze(new_state), reward, terminal)
 
                     # Evaluate node -> Perform simulation if not already in a terminal state
                     if not terminal and simulation:
@@ -322,21 +321,32 @@ class MCTSContinuous(MCTS):
 
             self.backprop(node, self.gamma)
 
-    @staticmethod
-    def selectionUCT(c_uct, node: NodeContinuous) -> ActionContinuous:
+    def selectionUCT(self,i, node: NodeContinuous) -> ActionContinuous:
         """ Select one of the child actions based on UCT rule """
-        UCT = np.array(
-            [
-                child_action.Q + c_uct * (np.sqrt(node.n + 1) / (child_action.n + 1))
-                for child_action in node.child_actions
-            ]
-        )
-        winner = argmax(UCT)
-        return node.child_actions[winner]
+
+        if node.check_pw(self.c_pw, self.kappa):
+            self.evaluation(node)
+            return node.child_actions[-1]
+        else:
+            UCT = np.array(
+                [
+                    child_action.Q + self.c_uct * (np.sqrt(node.n + 1) / (child_action.n + 1))
+                    for child_action in node.child_actions
+                ]
+            )
+            winner = argmax(UCT)
+            return node.child_actions[winner]
 
     @staticmethod
     def selection(action: ActionContinuous) -> NodeContinuous:
         return action.child_node
+
+    @staticmethod
+    def expansion(
+        action: ActionContinuous, state: np.array, reward: float, terminal: bool
+    ) -> NodeContinuous:
+        node = action.add_child_node(state, reward, terminal)
+        return node
 
     @staticmethod
     def simulation(mcts_env: gym.Env) -> np.array:
@@ -350,13 +360,6 @@ class MCTSContinuous(MCTS):
         return np.array(V)
 
     @staticmethod
-    def expansion(
-        action: ActionContinuous, state: np.array, reward: float, terminal: bool
-    ) -> NodeContinuous:
-        node = action.add_child_node(state, reward, terminal)
-        return node
-
-    @staticmethod
     def backprop(node: NodeContinuous, gamma: float) -> None:
         R = node.V
         # loop back-up until root is reached
@@ -367,9 +370,10 @@ class MCTSContinuous(MCTS):
             node = action.parent_node
             node.update_visit_counts()
 
-    def return_results(self) -> Tuple[np.array, np.array, np.array, np.array]:
+    def return_results(self) -> Tuple[np.array, np.array, torch.Tensor, np.array, np.array]:
         """ Process the output at the root node """
-        log_probs = np.array(
+        actions = np.array([child_action.action for child_action in self.root_node.child_actions])
+        log_probs = torch.stack(
             [child_action.log_prob for child_action in self.root_node.child_actions]
         )
         counts = np.array(
@@ -378,7 +382,7 @@ class MCTSContinuous(MCTS):
         log_counts = np.log(counts)
         Q = np.array([child_action.Q for child_action in self.root_node.child_actions])
         V_target = Q.max()
-        return self.root_node.state, log_probs, log_counts, V_target
+        return self.root_node.state, actions.squeeze(), log_probs.squeeze(), log_counts, V_target
 
     # TODO: Can we really use this in continuous action spaces? Tree reuse
     def forward(self, action: int, state: np.array) -> None:

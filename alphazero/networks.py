@@ -63,6 +63,8 @@ class NetworkContinuous(nn.Module):
         self,
         state_dim: int,
         action_dim: int,
+        action_space_low: float,
+        action_space_high: float,
         n_hidden_layers: int,
         n_hidden_units: int,
         log_max: int = 2,
@@ -72,6 +74,11 @@ class NetworkContinuous(nn.Module):
 
         self.state_dim = state_dim
         self.action_dim = action_dim
+
+        self.action_scale = torch.FloatTensor(
+            (action_space_high - action_space_low) / 2.)
+        self.action_bias = torch.FloatTensor(
+            (action_space_high + action_space_low) / 2.)
 
         self.LOG_SIG_MAX = log_max
         self.LOG_SIG_MIN = log_min
@@ -108,13 +115,6 @@ class NetworkContinuous(nn.Module):
         V_hat = self.value_head(x)
         self.train()
         return V_hat.detach().cpu().numpy()
-
-    def entropy(self, x: torch.Tensor) -> torch.Tensor:
-        mean, log_std, V_hat = self.forward(x)
-        log_std = torch.clamp(log_std, min=self.LOG_SIG_MIN, max=self.LOG_SIG_MAX)
-        std = log_std.exp()
-        normal = Normal(mean, std)
-        return normal.entropy(), V_hat
 
     def sample(self, x: torch.Tensor) -> Tuple[np.array, np.array, torch.Tensor]:
         x = F.elu(self.in_layer(x))

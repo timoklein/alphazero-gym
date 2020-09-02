@@ -1,5 +1,6 @@
 from __future__ import annotations
 import random
+import torch
 import numpy as np
 from typing import Tuple
 
@@ -47,7 +48,7 @@ class ReplayBuffer:
     def __len__(self) -> int:
         return len(self.experience)
 
-    def __next__(self) -> Tuple[np.array, np.array, np.array]:
+    def __next__(self) -> Tuple[np.array, ...]:
         if (self.sample_index + self.batch_size > self.size) and (
             not self.sample_index == 0
         ):
@@ -64,7 +65,16 @@ class ReplayBuffer:
             batch = [self.experience[i] for i in indices]
         self.sample_index += self.batch_size
 
-        state, value, policy = map(np.stack, zip(*batch))
-        return state, value, policy
+        # reshape experience into batches
+        arrays = []
+        for i in range(len(batch[0])):
+            to_add = [entry[i] for entry in batch]
+            # check if tensors are stored and stack them appropriately
+            if all(isinstance(x, torch.Tensor) for x in to_add):
+                arrays.append(torch.stack(to_add, dim=0))
+            else:
+                arrays.append(np.array(to_add))
+        return tuple(arrays)
 
     next = __next__
+

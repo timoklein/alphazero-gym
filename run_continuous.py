@@ -96,7 +96,8 @@ def run_continuous_agent(
             buffer.store((s, log_probs, log_counts, V))
 
             # Make the true step
-            _, step_reward, terminal, _ = Env.step(action)
+            state , step_reward, terminal, _ = Env.step(action)
+
             R += step_reward
             t_total += (
                 n_traces  # total number of environment steps (counts the mcts steps)
@@ -104,6 +105,9 @@ def run_continuous_agent(
 
             if terminal:
                 break
+            else:
+                # reset the mcts as we can't reuse the tree
+                agent.reset_mcts(root_state=state)
 
         # store the total episode return
         episode_returns.append(R)

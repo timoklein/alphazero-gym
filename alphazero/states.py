@@ -84,14 +84,14 @@ class NodeContinuous(Node):
         self.V = None
 
         # Child actions
-        self.child_actions = None
+        self.child_actions = []
     
-    def m_progressive_widening(self, c_pw, kappa):
+    def check_pw(self, c_pw: float, kappa: float) -> bool:
         pw_actions = ceil( c_pw*( (self.n + 1)**kappa ) )
-        if self.child_actions is None:
-            return pw_actions
-        else:
-            return max( pw_actions - self.num_children, 0 )
+        if 0 < pw_actions - self.num_children:
+            return True
+        
+        return False 
 
     @property
     def num_children(self):

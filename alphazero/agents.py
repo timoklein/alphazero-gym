@@ -241,6 +241,8 @@ class A0CAgent(Agent):
         self.nn = NetworkContinuous(
             state_dim=self.state_dim,
             action_dim=self.action_dim,
+            action_space_low=Env.action_space.low,
+            action_space_high=Env.action_space.high,
             n_hidden_layers=n_hidden_layers,
             n_hidden_units=n_hidden_units,
         )
@@ -273,37 +275,43 @@ class A0CAgent(Agent):
         self.mcts.search(
             n_traces=self.n_traces, Env=Env, mcts_env=mcts_env, simulation=False
         )
-        state, log_probs, log_counts, V_target = self.mcts.return_results()
-        # sample an action from the policy or pick best action if deterministic
-        pi = stable_normalizer(log_counts, self.temperature)
-        # if deterministic else np.random.choice(len(pi), p=pi)
-        action = pi.max()
+        state, actions, log_probs, log_counts, V_target = self.mcts.return_results()
+        if deterministic:
+            action = actions[log_counts.argmax()]
+        else:
+            pi = stable_normalizer(log_counts, self.temperature)
+            action = np.random.choice(actions, size=(1,), p=pi)
+
         return action, state, log_probs, log_counts, V_target
 
-    # TODO: Implement A0C loss
     def _calculate_policy_loss(
         self, log_probs: torch.Tensor, log_counts: torch.Tensor, reduction: str = "mean"
     ) -> torch.Tensor:
 
         with torch.no_grad():
             # calculate scaling term
-            log_diff = log_probs - self.tau*log_counts
-        
-        import ipdb; ipdb.set_trace(context=10)
+            log_diff = log_probs - self.tau * log_counts
 
-        policy_loss = torch.einsum("ni, nj -> n", log_diff, log_probs)
         # multiple with log_probs gradient
+        policy_loss = torch.einsum("ni, ni -> n", log_diff, log_probs)
 
         if reduction == "mean":
-            return policy_loss
+            return policy_loss.mean()
         else:
-            pass
+            return policy_loss.sum()
+
+    def _calculate_entropy_loss(
+        self, log_probs: torch.Tensor, reduction: str = "mean"
+    ) -> torch.Tensor:
+        if reduction == "mean":
+            return -self.alpha * log_probs.mean()
+        else:
+            return -self.alpha * log_probs.sum()
 
     def calculate_loss(
         self,
         log_probs: torch.Tensor,
         log_counts: torch.tensor,
-        entropy: torch.Tensor,
         V: torch.Tensor,
         V_hat: torch.Tensor,
     ) -> Dict[str, torch.Tensor]:
@@ -311,7 +319,7 @@ class A0CAgent(Agent):
         policy_loss = self._calculate_policy_loss(
             log_probs, log_counts, reduction="mean"
         )
-        entropy_loss = -self.alpha * entropy
+        entropy_loss = self._calculate_entropy_loss(log_probs)
         value_loss = self.value_loss_ratio * F.mse_loss(V_hat, V, reduction="mean")
         loss = policy_loss + entropy_loss + value_loss
         return {
@@ -330,17 +338,17 @@ class A0CAgent(Agent):
         states_tensor = torch.from_numpy(states).float()
         log_counts_tensor = torch.from_numpy(log_counts).float()
         values_tensor = torch.from_numpy(V_target).float()
-        entropy, V_hat = self.nn.entropy(states_tensor)
+        _, _, V_hat = self.nn(states_tensor)
 
         loss_dict = self.calculate_loss(
-            log_probs, log_counts_tensor, values_tensor, entropy, V_hat
+            log_probs, log_counts_tensor, values_tensor, V_hat
         )
         loss_dict["loss"].backward()
         self.optimizer.step()
 
         loss_dict["loss"] = loss_dict["loss"].detach().item()
         loss_dict["policy_loss"] = loss_dict["policy_loss"].detach().item()
-        loss_dict["entropy_loss"] = loss_dict["policy_loss"].detach().item()
+        loss_dict["entropy_loss"] = loss_dict["entropy_loss"].detach().item()
         loss_dict["value_loss"] = loss_dict["value_loss"].detach().item()
         return loss_dict
 
