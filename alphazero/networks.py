@@ -1,7 +1,7 @@
 from typing import Tuple
 import numpy as np
 import torch
-from torch import nn
+from torch import _is_deterministic, nn
 import torch.nn.functional as F
 from torch.distributions import Normal
 from abc import ABC, abstractmethod
@@ -63,8 +63,7 @@ class NetworkContinuous(nn.Module):
         self,
         state_dim: int,
         action_dim: int,
-        action_space_low: float,
-        action_space_high: float,
+        act_limit: float,
         n_hidden_layers: int,
         n_hidden_units: int,
         log_max: int = 2,
@@ -75,10 +74,7 @@ class NetworkContinuous(nn.Module):
         self.state_dim = state_dim
         self.action_dim = action_dim
 
-        self.action_scale = torch.FloatTensor(
-            (action_space_high - action_space_low) / 2.)
-        self.action_bias = torch.FloatTensor(
-            (action_space_high + action_space_low) / 2.)
+        self.act_limit = act_limit
 
         self.LOG_STD_MAX = log_max
         self.LOG_STD_MIN = log_min
@@ -94,7 +90,7 @@ class NetworkContinuous(nn.Module):
         self.in_layer = nn.Linear(self.state_dim, n_hidden_units)
 
         self.hidden = nn.Sequential(*layers)
-
+        
         self.mean_head = nn.Linear(n_hidden_units, self.action_dim)
         self.std_head = nn.Linear(n_hidden_units, self.action_dim)
         self.value_head = nn.Linear(n_hidden_units, 1)
@@ -104,9 +100,8 @@ class NetworkContinuous(nn.Module):
         x = self.hidden(x)
         mean = self.mean_head(x)
         log_std = self.std_head(x)
-        log_std = torch.tanh(log_std)
         # Trick from OpenAI spinning up to scale log standard deviation
-        log_std = self.LOG_STD_MIN + 0.5 * (self.LOG_STD_MAX - self.LOG_STD_MIN) * (log_std + 1)
+        log_std = torch.clamp(log_std, self.LOG_STD_MIN, self.LOG_STD_MAX)
 
         V_hat = self.value_head(x)
         return mean, log_std, V_hat
@@ -120,18 +115,22 @@ class NetworkContinuous(nn.Module):
         self.train()
         return V_hat.detach().cpu().numpy()
 
-    def sample(self, x: torch.Tensor) -> Tuple[np.array, np.array, torch.Tensor, torch.Tensor]:
+    def sample(self, x: torch.Tensor, deterministic: bool = False) -> Tuple[np.array, np.array, torch.Tensor, torch.Tensor]:
         mean, log_std, V_hat = self.forward(x)
         std = log_std.exp()
         normal = Normal(mean, std)
-        # no need reparameterization trick (mean + std * N(0,1))
-        x_t = normal.sample()
-        y_t = torch.tanh(x_t)
-        action = y_t * self.action_scale + self.action_bias
-        log_prob = normal.log_prob(x_t)
+
+        # Enable deterministic action if in eval mode
+        if deterministic:
+            action = mean
+        else:
+            # eparameterization trick (mean + std * N(0,1))
+            action = normal.sample()
+        
         # Enforcing Action Bound
-        # This is the correction for tanh squashing of the log_std and actions
-        log_prob -= torch.log(self.action_scale * (1 - y_t.pow(2)) +  1e-6)
-        log_prob = log_prob.sum(1, keepdim=True)
-        mean = torch.tanh(mean) * self.action_scale + self.action_bias
-        return action.detach().cpu().numpy(), mean.detach().cpu().numpy(), log_prob, V_hat
+        # This is the correction for squashing the log std and the actions
+        log_prob = normal.log_prob(action).sum(axis=-1)
+        log_prob -= (2*(np.log(2) - action - F.softplus(-2*action))).sum(axis=1)
+        action = torch.tanh(action)
+        action = self.act_limit * action
+        return action.detach().cpu().numpy(), log_prob, V_hat

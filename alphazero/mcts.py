@@ -7,6 +7,8 @@ import torch
 import numpy as np
 from abc import ABC, abstractmethod
 
+from torch.distributions.utils import logits_to_probs
+
 from .states import ActionContinuous, ActionDiscrete, NodeContinuous, NodeDiscrete
 from .helpers import copy_atari_state, restore_atari_state, stable_normalizer, argmax
 
@@ -261,6 +263,7 @@ class MCTSContinuous(MCTS):
 
     def evaluation(self, node: NodeContinuous, V: float = None) -> None:
         state = torch.from_numpy(node.state[None,]).float()
+        action, log_prob, V_hat = self.model.sample(state)
 
         # only use the neural network to estimate the value if we have none
         if not V:
@@ -274,7 +277,6 @@ class MCTSContinuous(MCTS):
 
         # add all actions allowed through progressive widening at once
         if node.check_pw(self.c_pw, self.kappa) and not node.terminal:
-            action, log_prob, _ = self.model.sample(state)
             new_child = ActionContinuous(action, log_prob, parent_node=node, Q_init=node.V)
             node.child_actions.append(new_child)
 
