@@ -276,11 +276,9 @@ class A0CAgent(Agent):
             n_traces=self.n_traces, Env=Env, mcts_env=mcts_env, simulation=False
         )
         state, actions, log_counts, V_hat = self.mcts.return_results()
-        if deterministic:
-            action = actions[log_counts.argmax()][np.newaxis]
-        else:
-            pi = stable_normalizer(log_counts, self.temperature)
-            action = np.random.choice(actions, size=(1,), p=pi)
+
+        # select the action that was visited most
+        action = actions[log_counts.argmax()][np.newaxis]
 
         return action, actions, state, log_counts, V_hat
 
