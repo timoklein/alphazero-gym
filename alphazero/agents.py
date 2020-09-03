@@ -268,15 +268,16 @@ class A0CAgent(Agent):
             root_state=root_state,
         )
 
+    # TODO: Pass deterministic acting to the neural network instead of using it like this
     def act(
-        self, Env: gym.Env, mcts_env: gym.Env, deterministic: bool = False
+        self, Env: gym.Env, mcts_env: gym.Env, deterministic: bool = True
     ) -> Tuple[int, np.array, np.array, np.array]:
         self.mcts.search(
             n_traces=self.n_traces, Env=Env, mcts_env=mcts_env, simulation=False
         )
         state, actions, log_counts, V_hat = self.mcts.return_results()
         if deterministic:
-            action = actions[log_counts.argmax()]
+            action = actions[log_counts.argmax()][np.newaxis]
         else:
             pi = stable_normalizer(log_counts, self.temperature)
             action = np.random.choice(actions, size=(1,), p=pi)
@@ -330,7 +331,7 @@ class A0CAgent(Agent):
         }
 
     def update(
-        self, obs: Tuple[np.array, torch.Tensor, np.array, np.array]
+        self, obs: Tuple[np.array, np.array, np.array, np.array]
     ) -> Dict[str, float]:
         self.optimizer.zero_grad()
 

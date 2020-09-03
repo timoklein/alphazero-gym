@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 import copy
 from typing import Tuple
 import gym
@@ -7,12 +5,10 @@ import torch
 import numpy as np
 from abc import ABC, abstractmethod
 
-from torch.distributions.utils import logits_to_probs
-
 from .states import ActionContinuous, ActionDiscrete, NodeContinuous, NodeDiscrete
 from .helpers import copy_atari_state, restore_atari_state, stable_normalizer, argmax
 
-MAX_COST_PENDULUM = 16.2736044
+PENDULUM_R_SCALE = 1000
 
 class MCTS(ABC):
     @abstractmethod
@@ -274,7 +270,8 @@ class MCTSContinuous(MCTS):
         action = self.model.sample_action(state)
         new_child = ActionContinuous(action, parent_node=node, Q_init=node.V)
         node.child_actions.append(new_child)
-
+    
+    # TODO: This should be able to determinstically select the best action with the nn
     def search(
         self, n_traces: int, Env: gym.Env, mcts_env: gym.Env, simulation: bool = False
     ):

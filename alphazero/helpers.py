@@ -1,9 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Helpers
-@author: thomas
-"""
 from typing import Tuple, Union
 import gym
 import numpy as np
