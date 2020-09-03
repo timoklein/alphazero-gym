@@ -57,25 +57,25 @@ def run_continuous_agent(
         gamma=gamma,
     )
 
-    # repo = git.Repo(search_parent_directories=True)
-    # config = {
-    #     "Commit": repo.head.object.hexsha,
-    #     "Environment": Env.unwrapped.spec.id,
-    #     "Discrete Env": agent.action_discrete,
-    #     "MCTS_traces": agent.n_traces,
-    #     "UCT constant": agent.c_uct,
-    #     "Discount factor": agent.gamma,
-    #     "Softmax temperature": agent.temperature,
-    #     "Network hidden layers": agent.n_hidden_layers,
-    #     "Network hidden units": agent.n_hidden_units,
-    #     "Value loss ratio": agent.value_loss_ratio,
-    #     "Learning rate": agent.lr,
-    #     "Batch size": buffer.batch_size,
-    #     "Replay buffer size": buffer.max_size,
-    #     "Environment seed": seed,
-    # }
+    repo = git.Repo(search_parent_directories=True)
+    config = {
+        "Commit": repo.head.object.hexsha,
+        "Environment": Env.unwrapped.spec.id,
+        "Discrete Env": agent.action_discrete,
+        "MCTS_traces": agent.n_traces,
+        "UCT constant": agent.c_uct,
+        "Discount factor": agent.gamma,
+        "Softmax temperature": agent.temperature,
+        "Network hidden layers": agent.n_hidden_layers,
+        "Network hidden units": agent.n_hidden_units,
+        "Value loss ratio": agent.value_loss_ratio,
+        "Learning rate": agent.lr,
+        "Batch size": buffer.batch_size,
+        "Replay buffer size": buffer.max_size,
+        "Environment seed": seed,
+    }
 
-    # run = wandb.init(name="AlphaZero Discrete", project="a0c", config=config)
+    run = wandb.init(name="A0C", project="a0c", config=config)
 
     pbar = trange(n_ep)
     for ep in pbar:
@@ -116,16 +116,16 @@ def run_continuous_agent(
 
         # agent.save_checkpoint(env=Env)
 
-        # run.log(
-        #     {
-        #         "Episode reward": R,
-        #         "Total loss": episode_loss["loss"],
-        #         "Policy loss": episode_loss["policy_loss"],
-        #         "Entropy loss": episode_loss["entropy_loss"],
-        #         "Value loss": episode_loss["value_loss"],
-        #     },
-        #     step=ep,
-        # )
+        run.log(
+            {
+                "Episode reward": R,
+                "Total loss": episode_loss["loss"],
+                "Policy loss": episode_loss["policy_loss"],
+                "Entropy loss": episode_loss["entropy_loss"],
+                "Value loss": episode_loss["value_loss"],
+            },
+            step=ep,
+        )
 
         reward = np.round(R, 2)
         e_time = np.round((time.time() - start), 1)

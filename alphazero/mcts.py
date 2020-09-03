@@ -12,6 +12,7 @@ from torch.distributions.utils import logits_to_probs
 from .states import ActionContinuous, ActionDiscrete, NodeContinuous, NodeDiscrete
 from .helpers import copy_atari_state, restore_atari_state, stable_normalizer, argmax
 
+MAX_COST_PENDULUM = 16.2736044
 
 class MCTS(ABC):
     @abstractmethod
