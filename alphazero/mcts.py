@@ -80,7 +80,6 @@ class MCTSDiscrete(MCTS):
         if self.is_atari:
             snapshot = copy_atari_state(Env)
 
-    # TODO: Split evaluation and prior adding?
     def evaluation(self, node: NodeDiscrete, V: float = None) -> None:
         state = torch.from_numpy(node.state[None,]).float()
 
@@ -271,8 +270,8 @@ class MCTSContinuous(MCTS):
 
     def add_pw_action(self, node: NodeContinuous) -> None:
         state = torch.from_numpy(node.state[None,]).float()
-        action, log_prob, _ = self.model(state)
-        new_child = ActionContinuous(action, log_prob, parent_node=node, Q_init=node.V)
+        action = self.model.sample_action(state)
+        new_child = ActionContinuous(action, parent_node=node, Q_init=node.V)
         node.child_actions.append(new_child)
 
     def search(
@@ -366,20 +365,16 @@ class MCTSContinuous(MCTS):
             node = action.parent_node
             node.update_visit_counts()
 
-    def return_results(self) -> Tuple[np.array, np.array, torch.Tensor, np.array, np.array]:
+    def return_results(self) -> Tuple[np.array, np.array, np.array, np.array]:
         """ Process the output at the root node """
         actions = np.array([child_action.action for child_action in self.root_node.child_actions])
-        log_probs = torch.stack(
-            [child_action.log_prob for child_action in self.root_node.child_actions]
-        )
         counts = np.array(
             [child_action.n for child_action in self.root_node.child_actions]
         )
         log_counts = np.log(counts)
         Q = np.array([child_action.Q for child_action in self.root_node.child_actions])
         V_target = Q.max()
-        V_hat = self.root_node.V_hat
-        return self.root_node.state, actions.squeeze(), log_probs.squeeze(), log_counts, V_hat, V_target
+        return self.root_node.state, actions.squeeze(), log_counts, V_target
 
     # TODO: Can we really use this in continuous action spaces? Tree reuse
     def forward(self, action: int, state: np.array) -> None:

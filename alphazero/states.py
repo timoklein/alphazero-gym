@@ -68,8 +68,6 @@ class NodeDiscrete(Node):
 class NodeContinuous(Node):
     """ Node object """
 
-    __slots__ = "V_hat"
-
     def __init__(
         self,
         state: np.array,
@@ -84,7 +82,6 @@ class NodeContinuous(Node):
         self.parent_action = parent_action
         self.n = 0
         self.V = None
-        self.V_hat = None
 
         # Child actions
         self.child_actions = []
@@ -132,11 +129,8 @@ class ActionDiscrete(Action):
 class ActionContinuous(Action):
     """ Action object """
 
-    __slots__ = "log_prob"
-
-    def __init__(self, action: np.array, log_prob: torch.Tensor, parent_node: NodeContinuous, Q_init: float):
+    def __init__(self, action: np.array, parent_node: NodeContinuous, Q_init: float):
         self.action = action
-        self.log_prob = log_prob
         self.parent_node = parent_node
         self.W = 0.0
         self.n = 0

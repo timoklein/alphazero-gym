@@ -68,12 +68,9 @@ class ReplayBuffer:
         # reshape experience into batches
         arrays = []
         for i in range(len(batch[0])):
-            to_add = [entry[i] for entry in batch]
-            # check if tensors are stored and stack them appropriately
-            if all(isinstance(x, torch.Tensor) for x in to_add):
-                arrays.append(torch.stack(to_add, dim=0))
-            else:
-                arrays.append(np.array(to_add))
+            to_add = np.array([entry[i] for entry in batch])
+            arrays.append(to_add) 
+        
         return tuple(arrays)
 
     next = __next__

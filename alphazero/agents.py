@@ -274,14 +274,14 @@ class A0CAgent(Agent):
         self.mcts.search(
             n_traces=self.n_traces, Env=Env, mcts_env=mcts_env, simulation=False
         )
-        state, actions, log_probs, log_counts, V_hat, V_target = self.mcts.return_results()
+        state, actions, log_counts, V_hat = self.mcts.return_results()
         if deterministic:
             action = actions[log_counts.argmax()]
         else:
             pi = stable_normalizer(log_counts, self.temperature)
             action = np.random.choice(actions, size=(1,), p=pi)
 
-        return action, state, log_probs, log_counts, V_hat, V_target
+        return action, actions, state, log_counts, V_hat
 
     def _calculate_policy_loss(
         self, log_probs: torch.Tensor, log_counts: torch.Tensor, reduction: str = "mean"
@@ -290,6 +290,7 @@ class A0CAgent(Agent):
         with torch.no_grad():
             # calculate scaling term
             log_diff = log_probs - self.tau * log_counts
+                
 
         # multiple with log_probs gradient
         policy_loss = torch.einsum("ni, ni -> n", log_diff, log_probs)
@@ -333,15 +334,16 @@ class A0CAgent(Agent):
     ) -> Dict[str, float]:
         self.optimizer.zero_grad()
 
-        states, log_probs, log_counts, V_hat, V_target = obs
+        actions, states, log_counts, V_target = obs
+
+        actions_tensor = torch.from_numpy(actions).float()
         states_tensor = torch.from_numpy(states).float()
         log_counts_tensor = torch.from_numpy(log_counts).float()
-        values_tensor = torch.from_numpy(V_target).float()
-        # TODO: Implement this using only actions and states as input
-        _, _, V_hat = self.nn(states_tensor)
+        values_tensor = torch.from_numpy(V_target).unsqueeze(dim=1).float()
+        log_probs, V_hat = self.nn.get_train_data(states_tensor, actions_tensor)
 
         loss_dict = self.calculate_loss(
-            log_probs, log_counts_tensor, values_tensor, V_hat
+            log_probs=log_probs, log_counts=log_counts_tensor, V=values_tensor, V_hat=V_hat
         )
         with torch.autograd.set_detect_anomaly(True):
             loss_dict["loss"].backward()

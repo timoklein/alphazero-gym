@@ -1,6 +1,7 @@
 from typing import Tuple
 import numpy as np
 import torch
+from torch.autograd.grad_mode import no_grad
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Normal
@@ -94,37 +95,40 @@ class NetworkContinuous(nn.Module):
         self.std_head = nn.Linear(n_hidden_units, self.action_dim)
         self.value_head = nn.Linear(n_hidden_units, 1)
 
-    def forward(self, x: torch.Tensor, deterministic: bool = False) -> Tuple[torch.Tensor, torch.Tensor]:
-        with torch.autograd.set_detect_anomaly(True):
-            x = F.elu(self.in_layer(x))
-            x = self.hidden(x)
-            mean = self.mean_head(x)
-            log_std = self.std_head(x)
-            V_hat = self.value_head(x)
+    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        x = F.elu(self.in_layer(x))
+        x = self.hidden(x)
+        mean = self.mean_head(x)
+        log_std = self.std_head(x)
+        V_hat = self.value_head(x)
 
-            # Trick from OpenAI spinning up to scale log standard deviation
-            log_std = torch.clamp(log_std, self.LOG_STD_MIN, self.LOG_STD_MAX)
+        # See SpinningUp SAC -> Pre-squashing of distribution
+        log_std = torch.clamp(log_std, self.LOG_STD_MIN, self.LOG_STD_MAX)
+        std = log_std.exp()
+        return mean, std, V_hat
 
-            std = log_std.exp()
-            normal = Normal(mean, std)
+    @torch.no_grad()
+    def sample_action(self, x: torch.Tensor, deterministic: bool = False) -> np.array:
+        x = F.elu(self.in_layer(x))
+        x = self.hidden(x)
+        mean = self.mean_head(x)
+        log_std = self.std_head(x)
 
-            # Enable deterministic action if in eval mode
-            if deterministic:
-                action = mean
-            else:
-                # reparameterization trick (mean + std * N(0,1))
-                action = normal.rsample()
+        std = log_std.exp()
 
-            # Enforcing Action Bound
-            # This is the correction for squashing the log std and the actions
-            log_prob = normal.log_prob(action).sum(axis=-1)
-            log_prob -= (2 * (np.log(2) - action - F.softplus(-2 * action))).sum(axis=1)
-            action = torch.tanh(action)
-            action = self.act_limit * action
-            return action.detach().cpu().numpy(), log_prob, V_hat
+        normal = Normal(mean, std)
 
-    # TODO: Implement act method
-    # TODO: Implement method to generate log_probs and V_hat from actions and state
+        # Enable deterministic action if in eval mode
+        if deterministic:
+            action = mean
+        else:
+            action = normal.sample()
+
+        # Enfore action bounds after sampling
+        action = torch.tanh(action)
+        action = self.act_limit * action
+
+        return action.detach().cpu().numpy()
 
     @torch.no_grad()
     def predict_V(self, x: torch.Tensor) -> np.array:
@@ -135,3 +139,15 @@ class NetworkContinuous(nn.Module):
         self.train()
         return V_hat.detach().cpu().numpy()
         
+    def get_train_data(self, states: torch.Tensor, actions: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        mean, std, V_hat = self.forward(states)
+
+        normal = Normal(mean, std)
+
+        log_probs = normal.log_prob(actions)
+        # correct for action bound squashing without summing
+        log_probs -= (2*(np.log(2) - actions - F.softplus(-2*actions)))
+
+
+        return log_probs, V_hat
+
