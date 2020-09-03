@@ -5,6 +5,7 @@ import time
 import git
 import wandb
 
+from alphazero.mcts import PENDULUM_R_SCALE
 from alphazero.agents import A0CAgent
 from alphazero.buffers import ReplayBuffer
 from alphazero.helpers import is_atari_game
@@ -96,6 +97,7 @@ def run_continuous_agent(
 
             # Make the true step
             state , step_reward, terminal, _ = Env.step(action)
+            step_reward /= PENDULUM_R_SCALE
 
             R += step_reward
             t_total += (
@@ -139,7 +141,7 @@ if __name__ == "__main__":
     parser.add_argument("--game", default="Pendulum-v0", help="Training environment")
     parser.add_argument("--n_ep", type=int, default=300, help="Number of episodes")
     parser.add_argument(
-        "--n_traces", type=int, default=25, help="Number of MCTS traces per step"
+        "--n_traces", type=int, default=10, help="Number of MCTS traces per step"
     )
     parser.add_argument(
         "--max_ep_len",
@@ -147,7 +149,7 @@ if __name__ == "__main__":
         default=200,
         help="Maximum number of steps per episode",
     )
-    parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
+    parser.add_argument("--lr", type=float, default=0.0001, help="Learning rate")
     parser.add_argument("--c_uct", type=float, default=0.05, help="UCT constant")
     parser.add_argument("--c_pw", type=float, default=1, help="Progressive widening constant")
     parser.add_argument("--kappa", type=float, default=0.5, help="Progressive widening exponent")
