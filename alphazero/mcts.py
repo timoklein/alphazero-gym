@@ -8,7 +8,8 @@ from abc import ABC, abstractmethod
 from .states import ActionContinuous, ActionDiscrete, NodeContinuous, NodeDiscrete
 from .helpers import copy_atari_state, restore_atari_state, stable_normalizer, argmax
 
-PENDULUM_R_SCALE = 1000
+# scales the step reward between -1 and 0
+PENDULUM_R_SCALE = 16.2736044
 
 class MCTS(ABC):
     @abstractmethod
@@ -299,6 +300,7 @@ class MCTSContinuous(MCTS):
 
                 # take step
                 new_state, reward, terminal, _ = mcts_env.step(action.action)
+                reward /= PENDULUM_R_SCALE
                 if getattr(action, "child_node"):
                     # selection
                     node = self.selection(action)
@@ -348,6 +350,7 @@ class MCTSContinuous(MCTS):
         while not terminal:
             action = mcts_env.action_space.sample()
             _, reward, terminal, _ = mcts_env.step(action)
+            reward /= PENDULUM_R_SCALE
             V += reward
 
         return np.array(V)

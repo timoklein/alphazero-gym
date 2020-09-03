@@ -151,9 +151,6 @@ if __name__ == "__main__":
     )
     parser.add_argument("--batch_size", type=int, default=32, help="Minibatch size")
     parser.add_argument(
-        "--window", type=int, default=25, help="Smoothing window for visualization"
-    )
-    parser.add_argument(
         "--n_hidden_layers", type=int, default=1, help="Number of hidden layers in NN"
     )
     parser.add_argument(

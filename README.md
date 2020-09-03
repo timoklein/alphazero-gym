@@ -23,14 +23,12 @@ Base implementation.
 - [x] Implement MCTS progressive widening.
 - [x] Implement A0C.
 - [x] Use Pendulum to test (might need some custom wrappers).
-- [ ] Move to torch state conversion into the forward methods of the neural networks.
-- [ ] Move run method into the agent to better implement playout cap randomization.
 - [ ] Enable GPU training.
 
 
 ## Possible Enhancements to try
 - [ ] Automatic entropy tuning a la SAC
-- [ ] Value loss scaling.
+- [ ] Value loss clipping.
 - [ ] Test a prioritized replay buffer.
 - [ ] Warm starting.
 - [ ] Playout cap randomization.
