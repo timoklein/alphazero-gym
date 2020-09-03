@@ -1,10 +1,9 @@
 from typing import Tuple
 import numpy as np
 import torch
-from torch import _is_deterministic, nn
+import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Normal
-from abc import ABC, abstractmethod
 
 
 class NetworkDiscrete(nn.Module):

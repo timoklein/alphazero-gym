@@ -1,4 +1,3 @@
-from numpy.lib.ufunclike import isposinf
 import torch
 import torch.nn.functional as F
 from torch import optim
@@ -77,7 +76,7 @@ class AlphaZeroAgent(Agent):
             n_hidden_layers=n_hidden_layers,
             n_hidden_units=n_hidden_units,
         )
-        self.optimizer = optim.RMSprop(
+        self.optimizer = RMSprop(
             self.nn.parameters(), lr=self.lr, alpha=0.9, eps=1e-07
         )
 
@@ -246,7 +245,7 @@ class A0CAgent(Agent):
             n_hidden_layers=n_hidden_layers,
             n_hidden_units=n_hidden_units,
         )
-        self.optimizer = optim.RMSprop(
+        self.optimizer = RMSprop(
             self.nn.parameters(), lr=self.lr, alpha=0.9, eps=1e-07
         )
 
