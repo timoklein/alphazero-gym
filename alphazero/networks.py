@@ -145,8 +145,11 @@ class NetworkContinuous(nn.Module):
 
         log_probs = normal.log_prob(actions)
         # correct for action bound squashing without summing
-        log_probs -= (2*(np.log(2) - actions - F.softplus(-2*actions)))
+        logp_policy = log_probs -  (2*(np.log(2) - actions - F.softplus(-2*actions)))
+
+        entropy = log_probs.sum(axis=-1)
+        entropy -= (2*(np.log(2) - actions - F.softplus(-2*actions))).sum(axis=1)
 
 
-        return log_probs, V_hat
+        return logp_policy, entropy, V_hat
 

@@ -28,7 +28,6 @@ Base implementation.
 
 ## Possible Enhancements to try
 - [ ] Automatic entropy tuning a la SAC
-- [ ] Value loss clipping.
 - [ ] Test a prioritized replay buffer.
 - [ ] Warm starting.
 - [ ] Playout cap randomization.
