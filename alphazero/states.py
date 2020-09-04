@@ -85,13 +85,13 @@ class NodeContinuous(Node):
 
         # Child actions
         self.child_actions = []
-    
+
     def check_pw(self, c_pw: float, kappa: float) -> bool:
-        pw_actions = ceil( c_pw*( (self.n + 1)**kappa ) )
+        pw_actions = ceil(c_pw * ((self.n + 1) ** kappa))
         if 0 < pw_actions - self.num_children:
             return True
-        
-        return False 
+
+        return False
 
     @property
     def num_children(self):

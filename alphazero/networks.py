@@ -94,7 +94,9 @@ class NetworkContinuous(nn.Module):
         self.std_head = nn.Linear(n_hidden_units, self.action_dim)
         self.value_head = nn.Linear(n_hidden_units, 1)
 
-    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def forward(
+        self, x: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         x = F.elu(self.in_layer(x))
         x = self.hidden(x)
         mean = self.mean_head(x)
@@ -137,19 +139,20 @@ class NetworkContinuous(nn.Module):
         V_hat = self.value_head(x)
         self.train()
         return V_hat.detach().cpu().numpy()
-        
-    def get_train_data(self, states: torch.Tensor, actions: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+
+    def get_train_data(
+        self, states: torch.Tensor, actions: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         mean, std, V_hat = self.forward(states)
 
         normal = Normal(mean, std)
 
         log_probs = normal.log_prob(actions)
         # correct for action bound squashing without summing
-        logp_policy = log_probs -  (2*(np.log(2) - actions - F.softplus(-2*actions)))
+        logp_policy = log_probs - (2 * (np.log(2) - actions - F.softplus(-2 * actions)))
 
         entropy = log_probs.sum(axis=-1)
-        entropy -= (2*(np.log(2) - actions - F.softplus(-2*actions))).sum(axis=1)
-
+        entropy -= (2 * (np.log(2) - actions - F.softplus(-2 * actions))).sum(axis=1)
 
         return logp_policy, entropy, V_hat
 

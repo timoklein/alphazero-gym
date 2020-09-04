@@ -7,6 +7,7 @@ import wandb
 
 from alphazero.agents import AlphaZeroAgent
 from alphazero.buffers import ReplayBuffer
+from alphazero.helpers import store_actions
 from alphazero.helpers import is_atari_game
 from rl.make_game import make_game
 
@@ -27,13 +28,19 @@ def run_discrete_agent(
     value_loss_ratio: float,
     seed: int,
 ):
-    """ Outer training loop """
     episode_returns = []  # storage
-    timepoints = []
+    R_max = -np.inf
+    best_actions = None
+    actions_list = []
+
     # Environments
     Env = make_game(game)
     is_atari = is_atari_game(Env)
     mcts_env = make_game(game) if is_atari else None
+
+    # set seeds
+    np.random.seed(seed)
+    Env.seed(seed)
 
     buffer = ReplayBuffer(max_size=buffer_size, batch_size=batch_size)
     t_total = 0  # total steps
@@ -75,10 +82,9 @@ def run_discrete_agent(
         start = time.time()
         state = Env.reset()
         R = 0.0  # Total return counter
-        Env.seed(seed)
         if is_atari:
             mcts_env.reset()
-            mcts_env.seed(seed)
+            mcts_env.seed(int(Env.seed()))
 
         agent.reset_mcts(root_state=state)
         for t in range(max_ep_len):
@@ -89,12 +95,19 @@ def run_discrete_agent(
 
             # Make the true step
             new_state, step_reward, terminal, _ = Env.step(action)
+            actions_list.append(action)
             R += step_reward
             t_total += (
                 n_traces  # total number of environment steps (counts the mcts steps)
             )
 
-            if terminal:
+            if terminal or t == max_ep_len - 1:
+                if R_max < R:
+                    actions_list.insert(0, Env.seed()[0])
+                    best_actions = actions_list
+                    R_max = R
+                    store_actions(game, best_actions)
+                actions_list.clear()
                 break
             else:
                 agent.mcts_forward(action, new_state)
@@ -121,7 +134,7 @@ def run_discrete_agent(
         e_time = np.round((time.time() - start), 1)
         pbar.set_description(f"{ep=}, {reward=}, {e_time=}s")
     # Return results
-    return episode_returns, timepoints
+    return episode_returns, best_actions
 
 
 if __name__ == "__main__":
@@ -170,7 +183,7 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    episode_returns, timepoints = run_discrete_agent(
+    episode_returns, best_actions = run_discrete_agent(
         game=args.game,
         n_ep=args.n_ep,
         n_traces=args.n_traces,
@@ -187,11 +200,3 @@ if __name__ == "__main__":
         seed=args.env_seed,
     )
 
-#    print('Showing best episode with return {}'.format(R_best))
-#    Env = make_game(args.game)
-#    Env = wrappers.Monitor(Env,os.getcwd() + '/best_episode',force=True)
-#    Env.reset()
-#    Env.seed(seed_best)
-#    for a in a_best:
-#        Env.step(a)
-#        Env.render()

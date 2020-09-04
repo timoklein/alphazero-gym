@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Tuple, Union
 import gym
 import numpy as np
@@ -37,15 +38,15 @@ def check_space(space) -> Tuple[Union[int, Tuple[int]], bool]:
     return dim, discrete
 
 
-def store_safely(folder, name: str, to_store: np.array) -> None:
+def store_actions(name: str, to_store: np.array) -> None:
     """ to prevent losing information due to interruption of process"""
-    new_name = folder + name + ".npy"
-    old_name = folder + name + "_old.npy"
-    if os.path.exists(new_name):
-        copyfile(new_name, old_name)
-    np.save(new_name, to_store)
-    if os.path.exists(old_name):
-        os.remove(old_name)
+    path = Path("runs/")
+    if not path.exists():
+        path.mkdir()
+
+    actions_path = path / f"{name}.npy"
+
+    np.save(actions_path, to_store)
 
 
 ### Atari helpers ###

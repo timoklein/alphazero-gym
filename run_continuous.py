@@ -7,7 +7,7 @@ import wandb
 
 from alphazero.agents import A0CAgent
 from alphazero.buffers import ReplayBuffer
-from alphazero.helpers import is_atari_game
+from alphazero.helpers import store_actions
 from rl.make_game import make_game
 
 
@@ -30,13 +30,17 @@ def run_continuous_agent(
     value_loss_ratio: float,
     seed: int,
 ):
-    """ Outer training loop """
     episode_returns = []  # storage
-    timepoints = []
+    R_max = -np.inf
+    best_actions = None
+    actions_list = []
     # Environments
     Env = make_game(game)
-    is_atari = is_atari_game(Env)
-    mcts_env = make_game(game) if is_atari else None
+    mcts_env = None
+
+    # set seeds
+    np.random.seed(seed)
+    Env.seed(seed)
 
     buffer = ReplayBuffer(max_size=buffer_size, batch_size=batch_size)
     t_total = 0  # total steps
@@ -66,6 +70,7 @@ def run_continuous_agent(
         "Progressive widening factor [c_pw]": agent.c_pw,
         "Progressive widening exponent [kappa]": agent.kappa,
         "Log counts scaling factor [tau]": agent.tau,
+        "Automatic Entropy tuning": agent.autotune,
         "Entropy regularization scaling factor [alpha]": agent.alpha,
         "Discount factor": agent.gamma,
         "Network hidden layers": agent.n_hidden_layers,
@@ -84,10 +89,6 @@ def run_continuous_agent(
         start = time.time()
         state = Env.reset()
         R = 0.0  # Total return counter
-        Env.seed(seed)
-        if is_atari:
-            mcts_env.reset()
-            mcts_env.seed(seed)
 
         agent.reset_mcts(root_state=state)
         for t in range(max_ep_len):
@@ -98,6 +99,7 @@ def run_continuous_agent(
 
             # Make the true step
             state, step_reward, terminal, _ = Env.step(action)
+            actions_list.append(action)
             step_reward /= 1000
 
             R += step_reward
@@ -105,7 +107,13 @@ def run_continuous_agent(
                 n_traces  # total number of environment steps (counts the mcts steps)
             )
 
-            if terminal:
+            if terminal or t == max_ep_len - 1:
+                if R_max < R:
+                    actions_list.insert(0, Env.seed())
+                    best_actions = actions_list
+                    R_max = R
+                    store_actions(game, best_actions)
+                actions_list.clear()
                 break
             else:
                 # reset the mcts as we can't reuse the tree
@@ -116,7 +124,6 @@ def run_continuous_agent(
 
         # Train
         episode_loss = agent.train(buffer)
-
         # agent.save_checkpoint(env=Env)
 
         info_dict = {
@@ -138,7 +145,7 @@ def run_continuous_agent(
         e_time = np.round((time.time() - start), 1)
         pbar.set_description(f"{ep=}, {reward=}, {e_time=}s")
     # Return results
-    return episode_returns, timepoints
+    return episode_returns, best_actions
 
 
 if __name__ == "__main__":
@@ -166,7 +173,7 @@ if __name__ == "__main__":
         "--tau", type=float, default=0.1, help="Log visit counts scaling factor"
     )
     parser.add_argument(
-        "--alpha", type=float, default=None, help="Entropy temperature parameter"
+        "--alpha", type=float, default=0.1, help="Entropy temperature parameter"
     )
     parser.add_argument("--gamma", type=float, default=1.0, help="Discount parameter")
     parser.add_argument(
@@ -193,7 +200,7 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    episode_returns, timepoints = run_continuous_agent(
+    episode_returns, actions_list = run_continuous_agent(
         game=args.game,
         n_ep=args.n_ep,
         n_traces=args.n_traces,
@@ -213,11 +220,3 @@ if __name__ == "__main__":
         seed=args.env_seed,
     )
 
-#    print('Showing best episode with return {}'.format(R_best))
-#    Env = make_game(args.game)
-#    Env = wrappers.Monitor(Env,os.getcwd() + '/best_episode',force=True)
-#    Env.reset()
-#    Env.seed(seed_best)
-#    for a in a_best:
-#        Env.step(a)
-#        Env.render()
