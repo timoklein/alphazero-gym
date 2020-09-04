@@ -24,10 +24,11 @@ Base implementation.
 - [x] Implement A0C.
 - [x] Use Pendulum to test (might need some custom wrappers).
 - [ ] Enable GPU training.
+- [ ] Factor out loss objects and use torch Categorical in Discrete Net?
 
 
 ## Possible Enhancements to try
-- [ ] Automatic entropy tuning a la SAC
+- [x] Automatic entropy tuning a la SAC
 - [ ] Test a prioritized replay buffer.
 - [ ] Warm starting.
 - [ ] Playout cap randomization.

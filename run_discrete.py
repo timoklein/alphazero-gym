@@ -94,7 +94,7 @@ def run_discrete_agent(
             buffer.store((s, V, pi))
 
             # Make the true step
-            new_state, step_reward, terminal, _ = Env.step(action)
+            state, step_reward, terminal, _ = Env.step(action)
             actions_list.append(action)
             R += step_reward
             t_total += (
@@ -110,7 +110,7 @@ def run_discrete_agent(
                 actions_list.clear()
                 break
             else:
-                agent.mcts_forward(action, new_state)
+                agent.mcts_forward(action, state)
 
         # store the total episode return
         episode_returns.append(R)

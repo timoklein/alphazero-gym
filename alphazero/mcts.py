@@ -381,24 +381,3 @@ class MCTSContinuous(MCTS):
         V_target = Q.max()
         return self.root_node.state, actions.squeeze(), log_counts, V_target
 
-    # TODO: Can we really use this in continuous action spaces? Tree reuse
-    def forward(self, action: int, state: np.array) -> None:
-        """ Move the root forward """
-        if not hasattr(self.root_node.child_actions[action], "child_node"):
-            self.root_node = None
-            self.root_state = state
-        elif (
-            np.linalg.norm(
-                self.root_node.child_actions[action].child_node.state - state
-            )
-            > 0.01
-        ):
-            print(
-                "Warning: this domain seems stochastic. Not re-using the subtree for next search. "
-                + "To deal with stochastic environments, implement progressive widening."
-            )
-            self.root_node = None
-            self.root_state = state
-        else:
-            self.root_node = self.root_node.child_actions[action].child_node
-
