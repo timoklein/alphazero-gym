@@ -91,12 +91,11 @@ class MCTSDiscrete(MCTS):
         else:
             node.V = V
         
-        if not node.terminal:
-            node.child_actions = [
-                ActionDiscrete(a, parent_node=node, Q_init=node.V)
-                for a in range(node.num_actions)
-            ]
-            node.priors = self.model.predict_pi(state).flatten()
+        node.child_actions = [
+            ActionDiscrete(a, parent_node=node, Q_init=node.V)
+            for a in range(node.num_actions)
+        ]
+        node.priors = self.model.predict_pi(state).flatten()
 
     def search(
         self, n_traces: int, Env: gym.Env, mcts_env: gym.Env, simulation: bool = False
