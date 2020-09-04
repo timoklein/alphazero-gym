@@ -24,7 +24,6 @@ def run_continuous_agent(
     gamma: float,
     buffer_size: int,
     batch_size: int,
-    temp: float,
     n_hidden_layers: int,
     n_hidden_units: int,
     value_loss_ratio: float,
@@ -48,7 +47,6 @@ def run_continuous_agent(
         value_loss_ratio=value_loss_ratio,
         n_traces=n_traces,
         lr=lr,
-        temperature=temp,
         c_uct=c_uct,
         c_pw=c_pw,
         kappa=kappa,
@@ -64,8 +62,11 @@ def run_continuous_agent(
         "Discrete Env": agent.action_discrete,
         "MCTS_traces": agent.n_traces,
         "UCT constant": agent.c_uct,
+        "Progressive widening factor [c_pw]": agent.c_pw,
+        "Progressive widening exponent [kappa]": agent.kappa,
+        "Log counts scaling factor [tau]": agent.tau,
+        "Entropy regularization scaling factor [alpha]": agent.alpha,
         "Discount factor": agent.gamma,
-        "Softmax temperature": agent.temperature,
         "Network hidden layers": agent.n_hidden_layers,
         "Network hidden units": agent.n_hidden_units,
         "Value loss ratio": agent.value_loss_ratio,
@@ -115,7 +116,7 @@ def run_continuous_agent(
         # Train
         episode_loss = agent.train(buffer)
 
-        # agent.save_checkpoint(env=Env)
+        agent.save_checkpoint(env=Env)
 
         run.log(
             {
@@ -154,12 +155,6 @@ if __name__ == "__main__":
     parser.add_argument("--kappa", type=float, default=0.5, help="Progressive widening exponent")
     parser.add_argument("--tau", type=float, default=0.1, help="Log visit counts scaling factor")
     parser.add_argument("--alpha", type=float, default=0.1, help="Entropy temperature parameter")
-    parser.add_argument(
-        "--temp",
-        type=float,
-        default=1.0,
-        help="Temperature in normalization of counts to policy target",
-    )
     parser.add_argument("--gamma", type=float, default=1.0, help="Discount parameter")
     parser.add_argument(
         "--buffer_size", type=int, default=1000, help="Size of the FIFO replay buffer"
@@ -199,7 +194,6 @@ if __name__ == "__main__":
         gamma=args.gamma,
         buffer_size=args.buffer_size,
         batch_size=args.batch_size,
-        temp=args.temp,
         n_hidden_layers=args.n_hidden_layers,
         n_hidden_units=args.n_hidden_units,
         value_loss_ratio=args.value_ratio,

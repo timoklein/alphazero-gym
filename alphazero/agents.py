@@ -41,7 +41,7 @@ class Agent(ABC):
     def save_checkpoint(self):
         ...
 
-
+# FIXME: Discrete Agent is currently broken
 class AlphaZeroAgent(Agent):
     def __init__(
         self,
@@ -178,6 +178,12 @@ class AlphaZeroAgent(Agent):
         )
         self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
 
+        self.n_traces = checkpoint["agent"]["n_traces"]
+        self.c_uct = checkpoint["agent"]["c_uct"]
+        self.gamma = checkpoint["agent"]["gamma"]
+        self.temperature = checkpoint["agent"]["temperature"]
+        self.value_loss_ratio = checkpoint["agent"]["value_loss_ratio"]
+
     def save_checkpoint(self, env, name: str = None) -> None:
         path = Path("models/")
         if not path.exists():
@@ -197,6 +203,13 @@ class AlphaZeroAgent(Agent):
                 "model_state_dict": self.nn.state_dict(),
                 "optimizer_lr": self.optimizer.param_groups[0]["lr"],
                 "optimizer_state_dict": self.optimizer.state_dict(),
+                "agent" : {
+                    "n_traces": self.n_traces,
+                    "c_uct": self.c_uct,
+                    "gamma": self.gamma,
+                    "temperature": self.temperature,
+                    "value_loss_ratio": self.value_loss_ratio
+                }
             },
             model_path,
         )
@@ -211,7 +224,6 @@ class A0CAgent(Agent):
         value_loss_ratio: float,
         n_traces: int,
         lr: float,
-        temperature: float,
         c_uct: float,
         c_pw: float,
         kappa: float,
@@ -234,7 +246,6 @@ class A0CAgent(Agent):
         self.alpha = alpha
         self.gamma = gamma
         self.lr = lr
-        self.temperature = temperature
         self.value_loss_ratio = value_loss_ratio
 
         # action_dim*2 -> Needs both location and scale for one dimension
@@ -368,9 +379,10 @@ class A0CAgent(Agent):
     def load_checkpoint(self, name: str) -> None:
         model_path = (Path("models") / name).with_suffix(".tar")
         checkpoint = torch.load(model_path)
-        self.nn = NetworkDiscrete(
+        self.nn = NetworkContinuous(
             state_dim=checkpoint["env_state_dim"],
             action_dim=checkpoint["env_action_dim"],
+            act_limit=checkpoint["act_limit"],
             n_hidden_layers=checkpoint["n_hidden_layers"],
             n_hidden_units=checkpoint["n_hidden_units"],
         )
@@ -381,6 +393,15 @@ class A0CAgent(Agent):
             self.nn.parameters(), lr=self.lr, alpha=0.9, eps=1e-07
         )
         self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+
+        self.n_traces = checkpoint["agent"]["n_traces"]
+        self.c_uct = checkpoint["agent"]["c_uct"]
+        self.c_pw = checkpoint["agent"]["c_pw"]
+        self.kappa = checkpoint["agent"]["kappa"]
+        self.tau = checkpoint["agent"]["tau"]
+        self.alpha = checkpoint["agent"]["alpha"]
+        self.gamma = checkpoint["agent"]["gamma"]
+        self.value_loss_ratio = checkpoint["agent"]["value_loss_ratio"]
 
     def save_checkpoint(self, env, name: str = None) -> None:
         path = Path("models/")
@@ -394,13 +415,24 @@ class A0CAgent(Agent):
         torch.save(
             {
                 "env": env.unwrapped.spec.id,
-                "env_state_dim": self.state_dim[0],
+                "env_state_dim": self.state_dim,
                 "env_action_dim": self.action_dim,
+                "act_limit": env.action_space.high[0],
                 "n_hidden_layers": self.nn.n_hidden_layers,
                 "n_hidden_units": self.nn.n_hidden_units,
                 "model_state_dict": self.nn.state_dict(),
                 "optimizer_lr": self.optimizer.param_groups[0]["lr"],
                 "optimizer_state_dict": self.optimizer.state_dict(),
+                "agent" : {
+                    "n_traces": self.n_traces,
+                    "c_uct": self.c_uct,
+                    "c_pw": self.c_pw,
+                    "kappa": self.kappa,
+                    "tau": self.tau,
+                    "alpha": self.alpha,
+                    "gamma": self.gamma,
+                    "value_loss_ratio": self.value_loss_ratio
+                }
             },
             model_path,
         )
