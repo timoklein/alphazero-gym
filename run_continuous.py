@@ -10,6 +10,7 @@ from alphazero.buffers import ReplayBuffer
 from alphazero.helpers import is_atari_game
 from rl.make_game import make_game
 
+
 def run_continuous_agent(
     game: str,
     n_ep: int,
@@ -96,7 +97,7 @@ def run_continuous_agent(
             buffer.store((actions, s, log_counts, V))
 
             # Make the true step
-            state , step_reward, terminal, _ = Env.step(action)
+            state, step_reward, terminal, _ = Env.step(action)
             step_reward /= 1000
 
             R += step_reward
@@ -116,17 +117,21 @@ def run_continuous_agent(
         # Train
         episode_loss = agent.train(buffer)
 
-        agent.save_checkpoint(env=Env)
+        # agent.save_checkpoint(env=Env)
+
+        info_dict = {
+            "Episode reward": R,
+            "Total loss": episode_loss["loss"],
+            "Policy loss": episode_loss["policy_loss"],
+            "Entropy loss": episode_loss["entropy_loss"],
+            "Value loss": episode_loss["value_loss"],
+        }
+        if agent.autotune:
+            info_dict["Entropy temperature [alpha] loss"] = episode_loss["alpha_loss"]
+            info_dict["Temperature parameter [alpha]"] = agent.alpha
 
         run.log(
-            {
-                "Episode reward": R,
-                "Total loss": episode_loss["loss"],
-                "Policy loss": episode_loss["policy_loss"],
-                "Entropy loss": episode_loss["entropy_loss"],
-                "Value loss": episode_loss["value_loss"],
-            },
-            step=ep,
+            info_dict, step=ep,
         )
 
         reward = np.round(R, 2)
@@ -151,10 +156,18 @@ if __name__ == "__main__":
     )
     parser.add_argument("--lr", type=float, default=0.001, help="Learning rate")
     parser.add_argument("--c_uct", type=float, default=0.05, help="UCT constant")
-    parser.add_argument("--c_pw", type=float, default=1, help="Progressive widening constant")
-    parser.add_argument("--kappa", type=float, default=0.5, help="Progressive widening exponent")
-    parser.add_argument("--tau", type=float, default=0.1, help="Log visit counts scaling factor")
-    parser.add_argument("--alpha", type=float, default=0.1, help="Entropy temperature parameter")
+    parser.add_argument(
+        "--c_pw", type=float, default=1, help="Progressive widening constant"
+    )
+    parser.add_argument(
+        "--kappa", type=float, default=0.5, help="Progressive widening exponent"
+    )
+    parser.add_argument(
+        "--tau", type=float, default=0.1, help="Log visit counts scaling factor"
+    )
+    parser.add_argument(
+        "--alpha", type=float, default=None, help="Entropy temperature parameter"
+    )
     parser.add_argument("--gamma", type=float, default=1.0, help="Discount parameter")
     parser.add_argument(
         "--buffer_size", type=int, default=1000, help="Size of the FIFO replay buffer"

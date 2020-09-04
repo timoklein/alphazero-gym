@@ -1,14 +1,13 @@
 import torch
 import torch.nn.functional as F
-from torch import optim
+from torch.optim import RMSprop, Adam
 import numpy as np
 import gym
+from collections import defaultdict
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, Tuple
 from abc import ABC, abstractmethod
-
-from torch.optim.rmsprop import RMSprop
 
 from .networks import NetworkContinuous, NetworkDiscrete
 from .mcts import MCTSContinuous, MCTSDiscrete
@@ -41,7 +40,10 @@ class Agent(ABC):
     def save_checkpoint(self):
         ...
 
-# FIXME: Discrete Agent is currently broken
+
+# TODO: Add num_training epochs parameter
+
+
 class AlphaZeroAgent(Agent):
     def __init__(
         self,
@@ -76,9 +78,7 @@ class AlphaZeroAgent(Agent):
             n_hidden_layers=n_hidden_layers,
             n_hidden_units=n_hidden_units,
         )
-        self.optimizer = RMSprop(
-            self.nn.parameters(), lr=self.lr, alpha=0.9, eps=1e-07
-        )
+        self.optimizer = RMSprop(self.nn.parameters(), lr=self.lr, alpha=0.9, eps=1e-07)
 
     @property
     def n_hidden_layers(self) -> int:
@@ -173,9 +173,7 @@ class AlphaZeroAgent(Agent):
         self.nn.load_state_dict(checkpoint["model_state_dict"])
 
         self.lr = checkpoint["optimizer_lr"]
-        self.optimizer = optim.RMSprop(
-            self.nn.parameters(), lr=self.lr, alpha=0.9, eps=1e-07
-        )
+        self.optimizer = RMSprop(self.nn.parameters(), lr=self.lr, alpha=0.9, eps=1e-07)
         self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
 
         self.n_traces = checkpoint["agent"]["n_traces"]
@@ -203,13 +201,13 @@ class AlphaZeroAgent(Agent):
                 "model_state_dict": self.nn.state_dict(),
                 "optimizer_lr": self.optimizer.param_groups[0]["lr"],
                 "optimizer_state_dict": self.optimizer.state_dict(),
-                "agent" : {
+                "agent": {
                     "n_traces": self.n_traces,
                     "c_uct": self.c_uct,
                     "gamma": self.gamma,
                     "temperature": self.temperature,
-                    "value_loss_ratio": self.value_loss_ratio
-                }
+                    "value_loss_ratio": self.value_loss_ratio,
+                },
             },
             model_path,
         )
@@ -237,16 +235,28 @@ class A0CAgent(Agent):
         action_dim, self.action_discrete = check_space(Env.action_space)
         self.action_dim = action_dim[0]
 
+        self.autotune = True if alpha is None else False
+
         # initialize values
         self.n_traces = n_traces
         self.c_uct = c_uct
         self.c_pw = c_pw
         self.kappa = kappa
         self.tau = tau
-        self.alpha = alpha
         self.gamma = gamma
         self.lr = lr
         self.value_loss_ratio = value_loss_ratio
+
+        if self.autotune:
+            # set target entropy to -|A|
+            self.target_entropy = -self.action_dim
+            # initialize alpha to 1
+            self.log_alpha = torch.zeros(1, requires_grad=True)
+            self.alpha = self.log_alpha.exp().item()
+            # for simplicity: Use the same optimizer settings as for the neural network
+            self.a_optimizer = Adam([self.log_alpha], lr=self.lr)
+        else:
+            self.alpha = alpha
 
         # action_dim*2 -> Needs both location and scale for one dimension
         self.nn = NetworkContinuous(
@@ -256,7 +266,7 @@ class A0CAgent(Agent):
             n_hidden_layers=n_hidden_layers,
             n_hidden_units=n_hidden_units,
         )
-        self.optimizer = RMSprop(
+        self.n_optimizer = RMSprop(
             self.nn.parameters(), lr=self.lr, alpha=0.9, eps=1e-07
         )
 
@@ -300,7 +310,6 @@ class A0CAgent(Agent):
         with torch.no_grad():
             # calculate scaling term
             log_diff = log_probs - self.tau * log_counts
-                
 
         # multiple with log_probs gradient
         policy_loss = torch.einsum("ni, ni -> n", log_diff, log_probs)
@@ -317,14 +326,14 @@ class A0CAgent(Agent):
         entropy: torch.Tensor,
         V: torch.Tensor,
         V_hat: torch.Tensor,
-        reduce: str = "mean"
+        reduce: str = "mean",
     ) -> Dict[str, torch.Tensor]:
 
         policy_loss = self._calculate_policy_loss(
             log_probs, log_counts, reduction=reduce
         )
         entropy_loss = entropy.mean() if reduce == "mean" else entropy
-        entropy_loss *= -self.alpha 
+        entropy_loss *= -self.alpha
         value_loss = self.value_loss_ratio * F.mse_loss(V_hat, V, reduction=reduce)
         loss = policy_loss + entropy_loss + value_loss
         return {
@@ -337,7 +346,7 @@ class A0CAgent(Agent):
     def update(
         self, obs: Tuple[np.array, np.array, np.array, np.array]
     ) -> Dict[str, float]:
-        self.optimizer.zero_grad()
+        self.n_optimizer.zero_grad()
 
         actions, states, log_counts, V_target = obs
 
@@ -345,14 +354,31 @@ class A0CAgent(Agent):
         states_tensor = torch.from_numpy(states).float()
         log_counts_tensor = torch.from_numpy(log_counts).float()
         values_tensor = torch.from_numpy(V_target).unsqueeze(dim=1).float()
-        log_probs, entropy, V_hat = self.nn.get_train_data(states_tensor, actions_tensor)
+        log_probs, entropy, V_hat = self.nn.get_train_data(
+            states_tensor, actions_tensor
+        )
 
         loss_dict = self.calculate_loss(
-            log_probs=log_probs, log_counts=log_counts_tensor, entropy=entropy, V=values_tensor, V_hat=V_hat
+            log_probs=log_probs,
+            log_counts=log_counts_tensor,
+            entropy=entropy,
+            V=values_tensor,
+            V_hat=V_hat,
         )
-        with torch.autograd.set_detect_anomaly(True):
-            loss_dict["loss"].backward()
-            self.optimizer.step()
+        loss_dict["loss"].backward()
+        self.n_optimizer.step()
+
+        if self.autotune:
+            # we don't want to backprop through the network here
+            a_entropy = entropy.detach()
+            # calculate loss for entropy regularization parameter
+            alpha_loss = (-self.log_alpha * (a_entropy + self.target_entropy)).mean()
+            # optimize and set values
+            self.a_optimizer.zero_grad()
+            alpha_loss.backward()
+            self.a_optimizer.step()
+            self.alpha = self.log_alpha.exp().item()
+            loss_dict["alpha_loss"] = alpha_loss.detach().item()
 
         loss_dict["loss"] = loss_dict["loss"].detach().item()
         loss_dict["policy_loss"] = loss_dict["policy_loss"].detach().item()
@@ -362,7 +388,7 @@ class A0CAgent(Agent):
 
     def train(self, buffer: ReplayBuffer) -> float:
         buffer.reshuffle()
-        running_loss = {"loss": 0, "policy_loss": 0, "entropy_loss": 0, "value_loss": 0}
+        running_loss = defaultdict(float)
         for epoch in range(1):
             for batches, obs in enumerate(buffer):
                 loss = self.update(obs)
@@ -370,6 +396,8 @@ class A0CAgent(Agent):
                 running_loss["policy_loss"] += loss["policy_loss"]
                 running_loss["entropy_loss"] += loss["entropy_loss"]
                 running_loss["value_loss"] += loss["value_loss"]
+                if self.autotune:
+                    running_loss["alpha_loss"] += loss["alpha_loss"]
         for val in running_loss.values():
             val /= batches + 1
         return running_loss
@@ -388,11 +416,11 @@ class A0CAgent(Agent):
         )
         self.nn.load_state_dict(checkpoint["model_state_dict"])
 
-        self.lr = checkpoint["optimizer_lr"]
-        self.optimizer = optim.RMSprop(
+        self.lr = checkpoint["network_optimizer_lr"]
+        self.n_optimizer = RMSprop(
             self.nn.parameters(), lr=self.lr, alpha=0.9, eps=1e-07
         )
-        self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        self.n_optimizer.load_state_dict(checkpoint["network_optimizer_state_dict"])
 
         self.n_traces = checkpoint["agent"]["n_traces"]
         self.c_uct = checkpoint["agent"]["c_uct"]
@@ -421,9 +449,9 @@ class A0CAgent(Agent):
                 "n_hidden_layers": self.nn.n_hidden_layers,
                 "n_hidden_units": self.nn.n_hidden_units,
                 "model_state_dict": self.nn.state_dict(),
-                "optimizer_lr": self.optimizer.param_groups[0]["lr"],
-                "optimizer_state_dict": self.optimizer.state_dict(),
-                "agent" : {
+                "network_optimizer_lr": self.n_optimizer.param_groups[0]["lr"],
+                "network_optimizer_state_dict": self.n_optimizer.state_dict(),
+                "agent": {
                     "n_traces": self.n_traces,
                     "c_uct": self.c_uct,
                     "c_pw": self.c_pw,
@@ -431,8 +459,8 @@ class A0CAgent(Agent):
                     "tau": self.tau,
                     "alpha": self.alpha,
                     "gamma": self.gamma,
-                    "value_loss_ratio": self.value_loss_ratio
-                }
+                    "value_loss_ratio": self.value_loss_ratio,
+                },
             },
             model_path,
         )

@@ -11,6 +11,7 @@ from .helpers import copy_atari_state, restore_atari_state, stable_normalizer, a
 # scales the step reward between -1 and 0
 PENDULUM_R_SCALE = 16.2736044
 
+
 class MCTS(ABC):
     @abstractmethod
     def selectionUCT(self):
@@ -90,7 +91,7 @@ class MCTSDiscrete(MCTS):
             )
         else:
             node.V = V
-        
+
         node.child_actions = [
             ActionDiscrete(a, parent_node=node, Q_init=node.V)
             for a in range(node.num_actions)
@@ -260,17 +261,17 @@ class MCTSContinuous(MCTS):
         else:
             state = torch.from_numpy(node.state[None,]).float()
             node.V = (
-                    np.squeeze(self.model.predict_V(state))
-                    if not node.terminal
-                    else np.array(0.0)
-                )
+                np.squeeze(self.model.predict_V(state))
+                if not node.terminal
+                else np.array(0.0)
+            )
 
     def add_pw_action(self, node: NodeContinuous) -> None:
         state = torch.from_numpy(node.state[None,]).float()
         action = self.model.sample_action(state)
         new_child = ActionContinuous(action, parent_node=node, Q_init=node.V)
         node.child_actions.append(new_child)
-    
+
     # TODO: This should be able to determinstically select the best action with the nn
     def search(
         self, n_traces: int, Env: gym.Env, mcts_env: gym.Env, simulation: bool = False
@@ -285,7 +286,6 @@ class MCTSContinuous(MCTS):
         else:
             self.add_value_estimate(self.root_node)
             self.add_pw_action(self.root_node)
-        
 
         for i in range(n_traces):
             # reset to root for new trace
@@ -306,7 +306,9 @@ class MCTSContinuous(MCTS):
                     continue
                 else:
                     # expansion
-                    node = self.expansion(action, np.squeeze(new_state), reward, terminal)
+                    node = self.expansion(
+                        action, np.squeeze(new_state), reward, terminal
+                    )
 
                     if not terminal and simulation:
                         self.add_value_estimate(node, mcts_env)
@@ -316,7 +318,7 @@ class MCTSContinuous(MCTS):
 
             self.backprop(node, self.gamma)
 
-    def selectionUCT(self,node: NodeContinuous) -> ActionContinuous:
+    def selectionUCT(self, node: NodeContinuous) -> ActionContinuous:
         """ Select one of the child actions based on UCT rule """
         if node.check_pw(self.c_pw, self.kappa):
             self.add_pw_action(node)
@@ -324,7 +326,8 @@ class MCTSContinuous(MCTS):
         else:
             UCT = np.array(
                 [
-                    child_action.Q + self.c_uct * (np.sqrt(node.n + 1) / (child_action.n + 1))
+                    child_action.Q
+                    + self.c_uct * (np.sqrt(node.n + 1) / (child_action.n + 1))
                     for child_action in node.child_actions
                 ]
             )
@@ -367,7 +370,9 @@ class MCTSContinuous(MCTS):
 
     def return_results(self) -> Tuple[np.array, np.array, np.array, np.array]:
         """ Process the output at the root node """
-        actions = np.array([child_action.action for child_action in self.root_node.child_actions])
+        actions = np.array(
+            [child_action.action for child_action in self.root_node.child_actions]
+        )
         counts = np.array(
             [child_action.n for child_action in self.root_node.child_actions]
         )
