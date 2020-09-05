@@ -5,7 +5,6 @@ import numpy as np
 from typing import Tuple
 
 
-# TODO: This always returns actions as well. Return using map and np stack
 class ReplayBuffer:
     """ Experience Replay Buffer  """
 
@@ -67,12 +66,7 @@ class ReplayBuffer:
         self.sample_index += self.batch_size
 
         # reshape experience into batches
-        arrays = []
-        for i in range(len(batch[0])):
-            to_add = np.array([entry[i] for entry in batch])
-            arrays.append(to_add) 
-        
-        return tuple(arrays)
+        states, actions, counts, values = map(np.stack, zip(*batch))
+        return states, actions, counts, values
 
     next = __next__
-

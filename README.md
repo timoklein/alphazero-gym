@@ -23,16 +23,16 @@ Base implementation.
 - [x] Implement MCTS progressive widening.
 - [x] Implement A0C.
 - [x] Use Pendulum to test (might need some custom wrappers).
-- [ ] Enable GPU training.
-- [ ] Factor out loss objects and use torch Categorical in Discrete Net
+- [x] Factor out loss objects and use torch Categorical in Discrete Net
 - [ ] Refactor discrete version to always return actions as well
 - [ ] Refactor buffer into more efficient version
 - [ ] Remove the argparse crap and use Hydra instead
+- [ ] Enable GPU training.
 
 
 ## Possible Enhancements to try
 - [x] Automatic entropy tuning a la SAC
 - [ ] Test a prioritized replay buffer.
 - [ ] Warm starting.
-- [ ] Playout cap randomization.
 - [ ] RAD style data augmentations.
+- [ ] Playout cap randomization.

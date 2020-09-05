@@ -1,6 +1,6 @@
 import torch
 import torch.nn.functional as F
-from torch.optim import RMSprop, Adam
+from torch.optim import RMSprop
 import numpy as np
 import gym
 from collections import defaultdict
@@ -11,7 +11,7 @@ from abc import ABC, abstractmethod
 
 from .networks import NetworkContinuous, NetworkDiscrete
 from .mcts import MCTSContinuous, MCTSDiscrete
-from .losses import A0CLoss, Loss
+from .losses import Loss
 from .helpers import is_atari_game, check_space, stable_normalizer
 from .buffers import ReplayBuffer
 
@@ -107,10 +107,11 @@ class AlphaZeroAgent(Agent):
         self, Env: gym.Env, mcts_env: gym.Env, deterministic: bool = False
     ) -> Tuple[int, np.array, np.array, np.array]:
         self.mcts.search(n_traces=self.n_traces, Env=Env, mcts_env=mcts_env)
-        state, pi, V = self.mcts.return_results(self.temperature)
+        state, actions, counts, V = self.mcts.return_results()
+        pi = stable_normalizer(counts, self.temperature)
         # sample an action from the policy or pick best action if deterministic
         action = pi.argmax() if deterministic else np.random.choice(len(pi), p=pi)
-        return action, state, pi, V
+        return action, state, actions, counts, V
 
     def mcts_forward(self, action: int, node: np.array) -> None:
         self.mcts.forward(action, node)
@@ -118,10 +119,11 @@ class AlphaZeroAgent(Agent):
     def update(self, obs: Tuple[np.array, np.array, np.array]) -> Dict[str, float]:
         self.optimizer.zero_grad()
 
-        state_batch, V_batch, pi_batch = obs
-        states_tensor = torch.from_numpy(state_batch).float()
-        values_tensor = torch.from_numpy(V_batch).float()
-        action_probs_tensor = torch.from_numpy(pi_batch).float()
+        states, actions, counts, V_target = obs
+        states_tensor = torch.from_numpy(states).float()
+        values_tensor = torch.from_numpy(V_target).float()
+
+        action_probs_tensor = F.softmax(torch.from_numpy(counts).float(), dim=-1)
 
         # TODO: Needs to work for both losses
         pi_logits, V_hat = self.nn(states_tensor)
@@ -256,24 +258,26 @@ class A0CAgent(Agent):
         self.mcts.search(
             n_traces=self.n_traces, Env=Env, mcts_env=mcts_env, simulation=False
         )
-        state, actions, log_counts, V_hat = self.mcts.return_results()
+        state, actions, counts, V_hat = self.mcts.return_results()
 
         # select the action that was visited most
-        action = actions[log_counts.argmax()][np.newaxis]
+        action = actions[counts.argmax()][np.newaxis]
 
-        return action, actions, state, log_counts, V_hat
+        return action, state, actions, counts, V_hat
 
     def update(
         self, obs: Tuple[np.array, np.array, np.array, np.array]
     ) -> Dict[str, float]:
         self.n_optimizer.zero_grad()
 
-        actions, states, log_counts, V_target = obs
+        states, actions, counts, V_target = obs
 
         actions_tensor = torch.from_numpy(actions).float()
         states_tensor = torch.from_numpy(states).float()
-        log_counts_tensor = torch.from_numpy(log_counts).float()
         values_tensor = torch.from_numpy(V_target).unsqueeze(dim=1).float()
+
+        log_counts_tensor = torch.log(torch.from_numpy(counts).float())
+
         log_probs, entropy, V_hat = self.nn.get_train_data(
             states_tensor, actions_tensor
         )

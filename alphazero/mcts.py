@@ -13,12 +13,13 @@ from .states import (
     NodeContinuous,
     NodeDiscrete,
 )
-from .helpers import copy_atari_state, restore_atari_state, stable_normalizer, argmax
+from .helpers import copy_atari_state, restore_atari_state, argmax
 
 # scales the step reward between -1 and 0
 PENDULUM_R_SCALE = 16.2736044
 
 
+# TODO: Put different estimation functions for V_target in here
 class MCTS(ABC):
     @abstractmethod
     def selectionUCT(self):
@@ -62,7 +63,6 @@ class MCTS(ABC):
             node.update_visit_counts()
 
 
-# TODO: Implement different kinds of value estimates
 # TODO: Implement different kinds of return methods
 # TODO: Return counts in the discrete version as well
 class MCTSDiscrete(MCTS):
@@ -184,15 +184,17 @@ class MCTSDiscrete(MCTS):
         winner = argmax(UCT)
         return node.child_actions[winner]
 
-    def return_results(self, temperature: float) -> Tuple[np.array, np.array, np.array]:
+    def return_results(self) -> Tuple[np.array, np.array, np.array, np.array]:
         """ Process the output at the root node """
+        actions = np.array(
+            [child_action.action for child_action in self.root_node.child_actions]
+        )
         counts = np.array(
             [child_action.n for child_action in self.root_node.child_actions]
         )
         Q = np.array([child_action.Q for child_action in self.root_node.child_actions])
-        pi_target = stable_normalizer(counts, temperature)
         V_target = np.sum((counts / np.sum(counts)) * Q)[None]
-        return self.root_node.state, pi_target, V_target
+        return self.root_node.state, actions, counts, V_target
 
     def forward(self, action: int, state: np.array) -> None:
         """ Move the root forward """
@@ -336,8 +338,7 @@ class MCTSContinuous(MCTS):
         counts = np.array(
             [child_action.n for child_action in self.root_node.child_actions]
         )
-        log_counts = np.log(counts)
         Q = np.array([child_action.Q for child_action in self.root_node.child_actions])
         V_target = Q.max()
-        return self.root_node.state, actions.squeeze(), log_counts, V_target
+        return self.root_node.state, actions.squeeze(), counts, V_target
 

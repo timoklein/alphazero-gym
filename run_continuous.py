@@ -72,21 +72,21 @@ def run_continuous_agent(
     config = {
         "Commit": repo.head.object.hexsha,
         "Environment": Env.unwrapped.spec.id,
+        "Environment seed": seed,
         "Discrete Env": agent.action_discrete,
         "MCTS_traces": agent.n_traces,
         "UCT constant": agent.c_uct,
         "Progressive widening factor [c_pw]": agent.c_pw,
         "Progressive widening exponent [kappa]": agent.kappa,
-        "Log counts scaling factor [tau]": agent.loss.tau,
-        "Policy Coefficient": agent.loss.policy_coeff,
-        "Value loss ratio": agent.loss.value_coeff,
         "Discount factor": agent.gamma,
         "Network hidden layers": agent.n_hidden_layers,
         "Network hidden units": agent.n_hidden_units,
         "Learning rate": agent.lr,
         "Batch size": buffer.batch_size,
         "Replay buffer size": buffer.max_size,
-        "Environment seed": seed,
+        "Log counts scaling factor [tau]": agent.loss.tau,
+        "Policy Coefficient": agent.loss.policy_coeff,
+        "Value loss ratio": agent.loss.value_coeff,
     }
 
     if isinstance(agent.loss, A0CLossTuned):
@@ -106,8 +106,8 @@ def run_continuous_agent(
         for t in range(max_ep_len):
             # MCTS step
             # run mcts and extract the root output
-            action, actions, s, log_counts, V = agent.act(Env=Env, mcts_env=mcts_env)
-            buffer.store((actions, s, log_counts, V))
+            action, s, actions, counts, V = agent.act(Env=Env, mcts_env=mcts_env)
+            buffer.store((s, actions, counts, V))
 
             # Make the true step
             state, step_reward, terminal, _ = Env.step(action)

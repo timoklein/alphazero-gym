@@ -99,8 +99,8 @@ def run_discrete_agent(
         for t in range(max_ep_len):
             # MCTS step
             # run mcts and extract the root output
-            action, s, pi, V = agent.act(Env=Env, mcts_env=mcts_env)
-            buffer.store((s, V, pi))
+            action, s, actions, counts, V = agent.act(Env=Env, mcts_env=mcts_env)
+            buffer.store((s, actions, counts, V))
 
             # Make the true step
             state, step_reward, terminal, _ = Env.step(action)
