@@ -15,8 +15,10 @@ def visualize(game: str) -> None:
     Env.reset()
     Env.seed(int(seed))
     for a in actions:
-        Env.step(np.array(a))
-        Env.step(a)
+        try:
+            Env.step(a)
+        except AssertionError:
+            Env.step(int(a))
         Env.render()
 
 
