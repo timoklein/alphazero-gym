@@ -3,7 +3,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.distributions import Normal
+from torch.distributions import Normal, Categorical
 
 
 class NetworkDiscrete(nn.Module):
@@ -37,6 +37,17 @@ class NetworkDiscrete(nn.Module):
         pi_hat = self.policy_head(x)
         V_hat = self.value_head(x)
         return pi_hat, V_hat
+
+    def get_train_data(
+        self, states: torch.Tensor, actions: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        pi_logits, V_hat = self.forward(states)
+
+        pi_hat = Categorical(F.softmax(pi_logits, dim=-1))
+        log_probs = pi_hat.log_prob(actions)
+        entropy = log_probs.sum(axis=-1)
+
+        return log_probs, entropy, V_hat
 
     @torch.no_grad()
     def predict_V(self, x: torch.Tensor) -> np.array:
@@ -108,6 +119,22 @@ class NetworkContinuous(nn.Module):
         std = log_std.exp()
         return mean, std, V_hat
 
+    def get_train_data(
+        self, states: torch.Tensor, actions: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        mean, std, V_hat = self.forward(states)
+
+        normal = Normal(mean, std)
+
+        log_probs = normal.log_prob(actions)
+        # correct for action bound squashing without summing
+        logp_policy = log_probs - (2 * (np.log(2) - actions - F.softplus(-2 * actions)))
+
+        entropy = log_probs.sum(axis=-1)
+        entropy -= (2 * (np.log(2) - actions - F.softplus(-2 * actions))).sum(axis=1)
+
+        return logp_policy, entropy, V_hat
+
     @torch.no_grad()
     def sample_action(self, x: torch.Tensor, deterministic: bool = False) -> np.array:
         self.eval()
@@ -141,20 +168,4 @@ class NetworkContinuous(nn.Module):
         V_hat = self.value_head(x)
         self.train()
         return V_hat.detach().cpu().numpy()
-
-    def get_train_data(
-        self, states: torch.Tensor, actions: torch.Tensor
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
-        mean, std, V_hat = self.forward(states)
-
-        normal = Normal(mean, std)
-
-        log_probs = normal.log_prob(actions)
-        # correct for action bound squashing without summing
-        logp_policy = log_probs - (2 * (np.log(2) - actions - F.softplus(-2 * actions)))
-
-        entropy = log_probs.sum(axis=-1)
-        entropy -= (2 * (np.log(2) - actions - F.softplus(-2 * actions))).sum(axis=1)
-
-        return logp_policy, entropy, V_hat
 
