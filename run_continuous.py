@@ -5,7 +5,7 @@ import time
 import git
 import wandb
 
-from alphazero.agents import A0CAgent
+from alphazero.agents import ContinuousAgent
 from alphazero.losses import A0CLoss, A0CLossTuned
 from alphazero.buffers import ReplayBuffer
 from alphazero.helpers import store_actions
@@ -55,7 +55,7 @@ def run_continuous_agent(
         reduction="mean",
     )
 
-    agent = A0CAgent(
+    agent = ContinuousAgent(
         Env,
         n_hidden_layers=n_hidden_layers,
         n_hidden_units=n_hidden_units,

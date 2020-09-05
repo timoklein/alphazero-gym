@@ -5,7 +5,7 @@ import time
 import git
 import wandb
 
-from alphazero.agents import AlphaZeroAgent
+from alphazero.agents import DiscreteAgent
 from alphazero.losses import A0CLoss, A0CLossTuned, AlphaZeroLoss
 from alphazero.buffers import ReplayBuffer
 from alphazero.helpers import store_actions
@@ -47,7 +47,7 @@ def run_discrete_agent(
     t_total = 0  # total steps
 
     loss = AlphaZeroLoss(1, value_loss_ratio, "mean")
-    agent = AlphaZeroAgent(
+    agent = DiscreteAgent(
         Env,
         n_hidden_layers=n_hidden_layers,
         n_hidden_units=n_hidden_units,

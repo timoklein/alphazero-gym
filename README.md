@@ -32,7 +32,7 @@ Base implementation.
 
 ## Possible Enhancements to try
 - [x] Automatic entropy tuning a la SAC
-- [ ] Implement different V_target options
+- [x] Implement different V_target options
 - [ ] Test a prioritized replay buffer.
 - [ ] Warm starting.
 - [ ] RAD style data augmentations.

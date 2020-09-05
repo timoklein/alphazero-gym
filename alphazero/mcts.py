@@ -216,7 +216,7 @@ class MCTSDiscrete(MCTS):
         counts = np.array(
             [child_action.n for child_action in self.root_node.child_actions]
         )
-        V_target = self.get_greedy_value_target()
+        V_target = self.get_softz_value_target(counts)
         return self.root_node.state, actions.squeeze(), counts, V_target
 
     def forward(self, action: int, state: np.array) -> None:

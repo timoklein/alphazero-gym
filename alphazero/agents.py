@@ -49,7 +49,7 @@ class Agent(ABC):
 # TODO: Add num_training epochs parameter
 
 
-class AlphaZeroAgent(Agent):
+class DiscreteAgent(Agent):
     def __init__(
         self,
         Env: gym.Env,
@@ -191,7 +191,7 @@ class AlphaZeroAgent(Agent):
         )
 
 
-class A0CAgent(Agent):
+class ContinuousAgent(Agent):
     def __init__(
         self,
         Env: gym.Env,
