@@ -100,7 +100,6 @@ def run_continuous_agent(
             # Make the true step
             state, step_reward, terminal, _ = Env.step(action)
             actions_list.append(action)
-            step_reward /= 1000
 
             R += step_reward
             t_total += (
