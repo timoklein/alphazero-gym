@@ -5,7 +5,14 @@ import torch
 import numpy as np
 from abc import ABC, abstractmethod
 
-from .states import ActionContinuous, ActionDiscrete, NodeContinuous, NodeDiscrete
+from .states import (
+    Action,
+    Node,
+    ActionContinuous,
+    ActionDiscrete,
+    NodeContinuous,
+    NodeDiscrete,
+)
 from .helpers import copy_atari_state, restore_atari_state, stable_normalizer, argmax
 
 # scales the step reward between -1 and 0
@@ -18,28 +25,44 @@ class MCTS(ABC):
         ...
 
     @abstractmethod
-    def selection(self):
-        ...
-
-    @abstractmethod
-    def expansion(self):
-        ...
-
-    @abstractmethod
-    def simulation(self):
-        ...
-
-    @abstractmethod
-    def backprop(self):
-        ...
-
-    @abstractmethod
     def search(self):
         ...
 
+    @staticmethod
+    def selection(action: Action) -> Node:
+        return action.child_node
+
+    @staticmethod
+    def expansion(
+        action: Action, state: np.array, reward: float, terminal: bool
+    ) -> Node:
+        node = action.add_child_node(state, reward, terminal)
+        return node
+
+    @staticmethod
+    def simulation(mcts_env: gym.Env) -> np.array:
+        V = 0
+        terminal = False
+        while not terminal:
+            action = mcts_env.action_space.sample()
+            _, reward, terminal, _ = mcts_env.step(action)
+            V += reward
+
+        return np.array(V)
+
+    @staticmethod
+    def backprop(node: Node, gamma: float):
+        R = node.V
+        # loop back-up until root is reached
+        while node.parent_action is not None:
+            R = node.r + gamma * R
+            action = node.parent_action
+            action.update(R)
+            node = action.parent_node
+            node.update_visit_counts()
+
 
 # TODO: Implement different kinds of value estimates
-# TODO: Move backup class into the ABC
 # TODO: Implement different kinds of return methods
 # TODO: Return counts in the discrete version as well
 class MCTSDiscrete(MCTS):
@@ -160,39 +183,6 @@ class MCTSDiscrete(MCTS):
         )
         winner = argmax(UCT)
         return node.child_actions[winner]
-
-    @staticmethod
-    def expansion(
-        action: ActionDiscrete, state: np.array, reward: float, terminal: bool
-    ) -> NodeDiscrete:
-        node = action.add_child_node(state, reward, terminal)
-        return node
-
-    @staticmethod
-    def selection(action: ActionDiscrete) -> NodeDiscrete:
-        return action.child_node
-
-    @staticmethod
-    def simulation(mcts_env: gym.Env) -> np.array:
-        V = 0
-        terminal = False
-        while not terminal:
-            action = mcts_env.action_space.sample()
-            _, reward, terminal, _ = mcts_env.step(action)
-            V += reward
-
-        return np.array(V)
-
-    @staticmethod
-    def backprop(node: NodeDiscrete, gamma: float):
-        R = node.V
-        # loop back-up until root is reached
-        while node.parent_action is not None:
-            R = node.r + gamma * R
-            action = node.parent_action
-            action.update(R)
-            node = action.parent_node
-            node.update_visit_counts()
 
     def return_results(self, temperature: float) -> Tuple[np.array, np.array, np.array]:
         """ Process the output at the root node """
@@ -337,40 +327,6 @@ class MCTSContinuous(MCTS):
             )
             winner = argmax(UCT)
             return node.child_actions[winner]
-
-    @staticmethod
-    def selection(action: ActionContinuous) -> NodeContinuous:
-        return action.child_node
-
-    @staticmethod
-    def expansion(
-        action: ActionContinuous, state: np.array, reward: float, terminal: bool
-    ) -> NodeContinuous:
-        node = action.add_child_node(state, reward, terminal)
-        return node
-
-    @staticmethod
-    def simulation(mcts_env: gym.Env) -> np.array:
-        V = 0
-        terminal = False
-        while not terminal:
-            action = mcts_env.action_space.sample()
-            _, reward, terminal, _ = mcts_env.step(action)
-            reward /= PENDULUM_R_SCALE
-            V += reward
-
-        return np.array(V)
-
-    @staticmethod
-    def backprop(node: NodeContinuous, gamma: float) -> None:
-        R = node.V
-        # loop back-up until root is reached
-        while node.parent_action is not None:
-            R = node.r + gamma * R
-            action = node.parent_action
-            action.update(R)
-            node = action.parent_node
-            node.update_visit_counts()
 
     def return_results(self) -> Tuple[np.array, np.array, np.array, np.array]:
         """ Process the output at the root node """
