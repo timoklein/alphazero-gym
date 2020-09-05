@@ -77,18 +77,22 @@ def run_continuous_agent(
         "UCT constant": agent.c_uct,
         "Progressive widening factor [c_pw]": agent.c_pw,
         "Progressive widening exponent [kappa]": agent.kappa,
-        # "Log counts scaling factor [tau]": agent.tau,
-        # "Automatic Entropy tuning": agent.autotune,
-        # "Entropy regularization scaling factor [alpha]": agent.alpha,
+        "Log counts scaling factor [tau]": agent.loss.tau,
+        "Policy Coefficient": agent.loss.policy_coeff,
+        "Value loss ratio": agent.loss.value_coeff,
         "Discount factor": agent.gamma,
         "Network hidden layers": agent.n_hidden_layers,
         "Network hidden units": agent.n_hidden_units,
-        # "Value loss ratio": loss.value_loss_ratio,
         "Learning rate": agent.lr,
         "Batch size": buffer.batch_size,
         "Replay buffer size": buffer.max_size,
         "Environment seed": seed,
     }
+
+    if isinstance(agent.loss, A0CLossTuned):
+        config["Automatic Entropy tuning"] = True
+    else:
+        config["Entropy Parameter alpha"] = agent.loss.alpha
 
     run = wandb.init(name="A0C", project="a0c", config=config)
 
@@ -136,9 +140,6 @@ def run_continuous_agent(
         info_dict["Episode reward"] = R
         if isinstance(agent.loss, A0CLossTuned):
             info_dict["alpha"] = agent.loss.alpha
-        # if agent.autotune:
-        #     info_dict["Entropy temperature [alpha] loss"] = episode_loss["alpha_loss"]
-        #     info_dict["Temperature parameter [alpha]"] = agent.alpha
 
         run.log(
             info_dict, step=ep,
