@@ -5,6 +5,7 @@ import numpy as np
 from typing import Tuple
 
 
+# TODO: This always returns actions as well. Return using map and np stack
 class ReplayBuffer:
     """ Experience Replay Buffer  """
 

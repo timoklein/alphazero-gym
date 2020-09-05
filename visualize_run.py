@@ -5,6 +5,7 @@ from gym import wrappers
 from rl.make_game import make_game
 
 
+# TODO: Something's wrong with the seed -> Fix it
 def visualize(game: str) -> None:
     # NOTE: Has to be run from a terminal, not from VS Code!
     cwd = Path.cwd()

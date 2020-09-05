@@ -11,6 +11,7 @@ from abc import ABC, abstractmethod
 
 from .networks import NetworkContinuous, NetworkDiscrete
 from .mcts import MCTSContinuous, MCTSDiscrete
+from .losses import A0CLoss, Loss
 from .helpers import is_atari_game, check_space, stable_normalizer
 from .buffers import ReplayBuffer
 
@@ -21,15 +22,7 @@ class Agent(ABC):
         ...
 
     @abstractmethod
-    def calculate_loss(self):
-        ...
-
-    @abstractmethod
     def update(self):
-        ...
-
-    @abstractmethod
-    def train(self):
         ...
 
     @abstractmethod
@@ -39,6 +32,18 @@ class Agent(ABC):
     @abstractmethod
     def save_checkpoint(self):
         ...
+
+    def train(self, buffer: ReplayBuffer) -> float:
+        buffer.reshuffle()
+        running_loss = defaultdict(float)
+        for epoch in range(1):
+            for batches, obs in enumerate(buffer):
+                loss = self.update(obs)
+                for key in loss.keys():
+                    running_loss[key] += loss[key]
+        for val in running_loss.values():
+            val /= batches + 1
+        return running_loss
 
 
 # TODO: Add num_training epochs parameter
@@ -50,12 +55,12 @@ class AlphaZeroAgent(Agent):
         Env: gym.Env,
         n_hidden_layers: int,
         n_hidden_units: int,
-        value_loss_ratio: float,
         n_traces: int,
         lr: float,
         temperature: float,
         c_uct: float,
         gamma: float,
+        loss: Loss,
     ) -> None:
         # get info about the environment
         state_dim, self.state_discrete = check_space(Env.observation_space)
@@ -68,7 +73,7 @@ class AlphaZeroAgent(Agent):
         self.gamma = gamma
         self.lr = lr
         self.temperature = temperature
-        self.value_loss_ratio = value_loss_ratio
+        self.loss = loss
 
         self.is_atari = is_atari_game(Env)
 
@@ -110,22 +115,6 @@ class AlphaZeroAgent(Agent):
     def mcts_forward(self, action: int, node: np.array) -> None:
         self.mcts.forward(action, node)
 
-    def calculate_loss(
-        self,
-        pi_logits: torch.Tensor,
-        V_hat: torch.tensor,
-        V: torch.Tensor,
-        pi: torch.Tensor,
-    ) -> Dict[str, torch.Tensor]:
-        # calculate policy loss from model logits
-        # first we have to convert the probabilities to labels
-        pi = pi.argmax(dim=1)
-        pi_loss = F.cross_entropy(pi_logits, pi)
-        # value loss
-        v_loss = self.value_loss_ratio * F.mse_loss(V_hat, V)
-        loss = pi_loss + v_loss
-        return {"loss": loss, "policy_loss": pi_loss, "value_loss": v_loss}
-
     def update(self, obs: Tuple[np.array, np.array, np.array]) -> Dict[str, float]:
         self.optimizer.zero_grad()
 
@@ -134,30 +123,14 @@ class AlphaZeroAgent(Agent):
         values_tensor = torch.from_numpy(V_batch).float()
         action_probs_tensor = torch.from_numpy(pi_batch).float()
 
+        # TODO: Needs to work for both losses
         pi_logits, V_hat = self.nn(states_tensor)
-        loss_dict = self.calculate_loss(
-            pi_logits, V_hat, values_tensor, action_probs_tensor
-        )
+        loss_dict = self.loss(pi_logits, action_probs_tensor, V_hat, values_tensor)
         loss_dict["loss"].backward()
         self.optimizer.step()
 
-        loss_dict["loss"] = loss_dict["loss"].detach().item()
-        loss_dict["policy_loss"] = loss_dict["policy_loss"].detach().item()
-        loss_dict["value_loss"] = loss_dict["value_loss"].detach().item()
-        return loss_dict
-
-    def train(self, buffer: ReplayBuffer) -> float:
-        buffer.reshuffle()
-        running_loss = {"loss": 0, "policy_loss": 0, "value_loss": 0}
-        for epoch in range(1):
-            for batches, obs in enumerate(buffer):
-                loss = self.update(obs)
-                running_loss["loss"] += loss["loss"]
-                running_loss["policy_loss"] += loss["policy_loss"]
-                running_loss["value_loss"] += loss["value_loss"]
-        for val in running_loss.values():
-            val /= batches + 1
-        return running_loss
+        info_dict = {key: float(value) for key, value in loss_dict.items()}
+        return info_dict
 
     # TODO: Need to map location to device
     # self.policy.load_state_dict(torch.load(actor_path, map_location=DEVICE))
@@ -180,8 +153,10 @@ class AlphaZeroAgent(Agent):
         self.c_uct = checkpoint["agent"]["c_uct"]
         self.gamma = checkpoint["agent"]["gamma"]
         self.temperature = checkpoint["agent"]["temperature"]
-        self.value_loss_ratio = checkpoint["agent"]["value_loss_ratio"]
+        # self.value_loss_ratio = checkpoint["agent"]["value_loss_ratio"]
 
+    # TODO: Load the loss correctly
+    # TODO: Fix loss saving and checkpointing
     def save_checkpoint(self, env, name: str = None) -> None:
         path = Path("models/")
         if not path.exists():
@@ -191,6 +166,7 @@ class AlphaZeroAgent(Agent):
         else:
             date_string = datetime.now().strftime(r"%Y_%m_%d__%H_%M_%S")
             model_path = path / f"{date_string}_{env.unwrapped.spec.id}.tar"
+        loss_info = self.loss.get_info()
         torch.save(
             {
                 "env": env.unwrapped.spec.id,
@@ -206,8 +182,8 @@ class AlphaZeroAgent(Agent):
                     "c_uct": self.c_uct,
                     "gamma": self.gamma,
                     "temperature": self.temperature,
-                    "value_loss_ratio": self.value_loss_ratio,
                 },
+                "loss": loss_info,
             },
             model_path,
         )
@@ -219,15 +195,13 @@ class A0CAgent(Agent):
         Env: gym.Env,
         n_hidden_layers: int,
         n_hidden_units: int,
-        value_loss_ratio: float,
         n_traces: int,
         lr: float,
         c_uct: float,
         c_pw: float,
         kappa: float,
-        tau: float,
-        alpha: float,
         gamma: float,
+        loss: Loss,
     ) -> None:
         # get info about the environment
         state_dim, self.state_discrete = check_space(Env.observation_space)
@@ -235,28 +209,14 @@ class A0CAgent(Agent):
         action_dim, self.action_discrete = check_space(Env.action_space)
         self.action_dim = action_dim[0]
 
-        self.autotune = True if alpha is None else False
-
         # initialize values
         self.n_traces = n_traces
         self.c_uct = c_uct
         self.c_pw = c_pw
         self.kappa = kappa
-        self.tau = tau
         self.gamma = gamma
         self.lr = lr
-        self.value_loss_ratio = value_loss_ratio
-
-        if self.autotune:
-            # set target entropy to -|A|
-            self.target_entropy = -self.action_dim
-            # initialize alpha to 1
-            self.log_alpha = torch.zeros(1, requires_grad=True)
-            self.alpha = self.log_alpha.exp().item()
-            # for simplicity: Use the same optimizer settings as for the neural network
-            self.a_optimizer = Adam([self.log_alpha], lr=self.lr)
-        else:
-            self.alpha = alpha
+        self.loss = loss
 
         # action_dim*2 -> Needs both location and scale for one dimension
         self.nn = NetworkContinuous(
@@ -303,46 +263,6 @@ class A0CAgent(Agent):
 
         return action, actions, state, log_counts, V_hat
 
-    def _calculate_policy_loss(
-        self, log_probs: torch.Tensor, log_counts: torch.Tensor, reduction: str
-    ) -> torch.Tensor:
-
-        with torch.no_grad():
-            # calculate scaling term
-            log_diff = log_probs - self.tau * log_counts
-
-        # multiple with log_probs gradient
-        policy_loss = torch.einsum("ni, ni -> n", log_diff, log_probs)
-
-        if reduction == "mean":
-            return policy_loss.mean()
-        else:
-            return policy_loss.sum()
-
-    def calculate_loss(
-        self,
-        log_probs: torch.Tensor,
-        log_counts: torch.tensor,
-        entropy: torch.Tensor,
-        V: torch.Tensor,
-        V_hat: torch.Tensor,
-        reduce: str = "mean",
-    ) -> Dict[str, torch.Tensor]:
-
-        policy_loss = self._calculate_policy_loss(
-            log_probs, log_counts, reduction=reduce
-        )
-        entropy_loss = entropy.mean() if reduce == "mean" else entropy
-        entropy_loss *= -self.alpha
-        value_loss = self.value_loss_ratio * F.mse_loss(V_hat, V, reduction=reduce)
-        loss = policy_loss + entropy_loss + value_loss
-        return {
-            "loss": loss,
-            "policy_loss": policy_loss,
-            "entropy_loss": entropy_loss,
-            "value_loss": value_loss,
-        }
-
     def update(
         self, obs: Tuple[np.array, np.array, np.array, np.array]
     ) -> Dict[str, float]:
@@ -358,7 +278,7 @@ class A0CAgent(Agent):
             states_tensor, actions_tensor
         )
 
-        loss_dict = self.calculate_loss(
+        loss_dict = self.loss(
             log_probs=log_probs,
             log_counts=log_counts_tensor,
             entropy=entropy,
@@ -368,40 +288,10 @@ class A0CAgent(Agent):
         loss_dict["loss"].backward()
         self.n_optimizer.step()
 
-        if self.autotune:
-            # we don't want to backprop through the network here
-            a_entropy = entropy.detach()
-            # calculate loss for entropy regularization parameter
-            alpha_loss = (-self.log_alpha * (a_entropy + self.target_entropy)).mean()
-            # optimize and set values
-            self.a_optimizer.zero_grad()
-            alpha_loss.backward()
-            self.a_optimizer.step()
-            self.alpha = self.log_alpha.exp().item()
-            loss_dict["alpha_loss"] = alpha_loss.detach().item()
+        info_dict = {key: float(value) for key, value in loss_dict.items()}
+        return info_dict
 
-        loss_dict["loss"] = loss_dict["loss"].detach().item()
-        loss_dict["policy_loss"] = loss_dict["policy_loss"].detach().item()
-        loss_dict["entropy_loss"] = loss_dict["entropy_loss"].detach().item()
-        loss_dict["value_loss"] = loss_dict["value_loss"].detach().item()
-        return loss_dict
-
-    def train(self, buffer: ReplayBuffer) -> float:
-        buffer.reshuffle()
-        running_loss = defaultdict(float)
-        for epoch in range(1):
-            for batches, obs in enumerate(buffer):
-                loss = self.update(obs)
-                running_loss["loss"] += loss["loss"]
-                running_loss["policy_loss"] += loss["policy_loss"]
-                running_loss["entropy_loss"] += loss["entropy_loss"]
-                running_loss["value_loss"] += loss["value_loss"]
-                if self.autotune:
-                    running_loss["alpha_loss"] += loss["alpha_loss"]
-        for val in running_loss.values():
-            val /= batches + 1
-        return running_loss
-
+    # TODO: Load the loss correctly
     # TODO: Need to map location to device
     # self.policy.load_state_dict(torch.load(actor_path, map_location=DEVICE))
     def load_checkpoint(self, name: str) -> None:
@@ -426,10 +316,10 @@ class A0CAgent(Agent):
         self.c_uct = checkpoint["agent"]["c_uct"]
         self.c_pw = checkpoint["agent"]["c_pw"]
         self.kappa = checkpoint["agent"]["kappa"]
-        self.tau = checkpoint["agent"]["tau"]
+        # self.tau = checkpoint["agent"]["tau"]
         self.alpha = checkpoint["agent"]["alpha"]
         self.gamma = checkpoint["agent"]["gamma"]
-        self.value_loss_ratio = checkpoint["agent"]["value_loss_ratio"]
+        # self.value_loss_ratio = checkpoint["agent"]["value_loss_ratio"]
 
     def save_checkpoint(self, env, name: str = None) -> None:
         path = Path("models/")
@@ -440,6 +330,16 @@ class A0CAgent(Agent):
         else:
             date_string = datetime.now().strftime(r"%Y_%m_%d__%H_%M_%S")
             model_path = path / f"{date_string}_{env.unwrapped.spec.id}.tar"
+
+        loss_info = {"name": type(self.loss).__name__}
+        loss_info.update(
+            {
+                key: getattr(self.loss, key)
+                for key in vars(self.loss)
+                if not key.startswith("_") and not key.startswith("training")
+            }
+        )
+
         torch.save(
             {
                 "env": env.unwrapped.spec.id,
@@ -456,10 +356,8 @@ class A0CAgent(Agent):
                     "c_uct": self.c_uct,
                     "c_pw": self.c_pw,
                     "kappa": self.kappa,
-                    "tau": self.tau,
                     "alpha": self.alpha,
                     "gamma": self.gamma,
-                    "value_loss_ratio": self.value_loss_ratio,
                 },
             },
             model_path,

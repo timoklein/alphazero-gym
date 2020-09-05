@@ -38,6 +38,10 @@ class MCTS(ABC):
         ...
 
 
+# TODO: Implement different kinds of value estimates
+# TODO: Move backup class into the ABC
+# TODO: Implement different kinds of return methods
+# TODO: Return counts in the discrete version as well
 class MCTSDiscrete(MCTS):
     """ MCTS object """
 

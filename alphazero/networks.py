@@ -110,6 +110,7 @@ class NetworkContinuous(nn.Module):
 
     @torch.no_grad()
     def sample_action(self, x: torch.Tensor, deterministic: bool = False) -> np.array:
+        self.eval()
         x = F.elu(self.in_layer(x))
         x = self.hidden(x)
         mean = self.mean_head(x)
@@ -128,6 +129,7 @@ class NetworkContinuous(nn.Module):
         # Enfore action bounds after sampling
         action = torch.tanh(action)
         action = self.act_limit * action
+        self.train()
 
         return action.detach().cpu().numpy()
 

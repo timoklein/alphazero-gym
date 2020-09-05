@@ -6,12 +6,13 @@ import git
 import wandb
 
 from alphazero.agents import AlphaZeroAgent
+from alphazero.losses import AlphaZeroLoss
 from alphazero.buffers import ReplayBuffer
 from alphazero.helpers import store_actions
 from alphazero.helpers import is_atari_game
 from rl.make_game import make_game
 
-
+# TODO: Fix logging
 def run_discrete_agent(
     game: str,
     n_ep: int,
@@ -45,16 +46,17 @@ def run_discrete_agent(
     buffer = ReplayBuffer(max_size=buffer_size, batch_size=batch_size)
     t_total = 0  # total steps
 
+    loss = AlphaZeroLoss(1, value_loss_ratio, "mean")
     agent = AlphaZeroAgent(
         Env,
         n_hidden_layers=n_hidden_layers,
         n_hidden_units=n_hidden_units,
-        value_loss_ratio=value_loss_ratio,
         n_traces=n_traces,
         lr=lr,
         temperature=temp,
         c_uct=c,
         gamma=gamma,
+        loss=loss
     )
 
     repo = git.Repo(search_parent_directories=True)
@@ -68,7 +70,7 @@ def run_discrete_agent(
         "Softmax temperature": agent.temperature,
         "Network hidden layers": agent.n_hidden_layers,
         "Network hidden units": agent.n_hidden_units,
-        "Value loss ratio": agent.value_loss_ratio,
+        # "Value loss ratio": agent.value_loss_ratio,
         "Learning rate": agent.lr,
         "Batch size": buffer.batch_size,
         "Replay buffer size": buffer.max_size,

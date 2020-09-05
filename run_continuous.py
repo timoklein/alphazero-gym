@@ -6,11 +6,12 @@ import git
 import wandb
 
 from alphazero.agents import A0CAgent
+from alphazero.losses import A0CLoss, A0CLossTuned
 from alphazero.buffers import ReplayBuffer
 from alphazero.helpers import store_actions
 from rl.make_game import make_game
 
-
+# TODO: Fix logging
 def run_continuous_agent(
     game: str,
     n_ep: int,
@@ -45,19 +46,26 @@ def run_continuous_agent(
     buffer = ReplayBuffer(max_size=buffer_size, batch_size=batch_size)
     t_total = 0  # total steps
 
+    loss = A0CLossTuned(
+        action_dim=Env.action_space.shape[0],
+        lr=lr,
+        tau=tau,
+        policy_coeff=1,
+        value_coeff=value_loss_ratio,
+        reduction="mean",
+    )
+
     agent = A0CAgent(
         Env,
         n_hidden_layers=n_hidden_layers,
         n_hidden_units=n_hidden_units,
-        value_loss_ratio=value_loss_ratio,
         n_traces=n_traces,
         lr=lr,
         c_uct=c_uct,
         c_pw=c_pw,
         kappa=kappa,
-        tau=tau,
-        alpha=alpha,
         gamma=gamma,
+        loss=loss,
     )
 
     repo = git.Repo(search_parent_directories=True)
@@ -69,13 +77,13 @@ def run_continuous_agent(
         "UCT constant": agent.c_uct,
         "Progressive widening factor [c_pw]": agent.c_pw,
         "Progressive widening exponent [kappa]": agent.kappa,
-        "Log counts scaling factor [tau]": agent.tau,
-        "Automatic Entropy tuning": agent.autotune,
-        "Entropy regularization scaling factor [alpha]": agent.alpha,
+        # "Log counts scaling factor [tau]": agent.tau,
+        # "Automatic Entropy tuning": agent.autotune,
+        # "Entropy regularization scaling factor [alpha]": agent.alpha,
         "Discount factor": agent.gamma,
         "Network hidden layers": agent.n_hidden_layers,
         "Network hidden units": agent.n_hidden_units,
-        "Value loss ratio": agent.value_loss_ratio,
+        # "Value loss ratio": loss.value_loss_ratio,
         "Learning rate": agent.lr,
         "Batch size": buffer.batch_size,
         "Replay buffer size": buffer.max_size,
@@ -122,19 +130,15 @@ def run_continuous_agent(
         episode_returns.append(R)
 
         # Train
-        episode_loss = agent.train(buffer)
+        info_dict = agent.train(buffer)
         # agent.save_checkpoint(env=Env)
 
-        info_dict = {
-            "Episode reward": R,
-            "Total loss": episode_loss["loss"],
-            "Policy loss": episode_loss["policy_loss"],
-            "Entropy loss": episode_loss["entropy_loss"],
-            "Value loss": episode_loss["value_loss"],
-        }
-        if agent.autotune:
-            info_dict["Entropy temperature [alpha] loss"] = episode_loss["alpha_loss"]
-            info_dict["Temperature parameter [alpha]"] = agent.alpha
+        info_dict["Episode reward"] = R
+        if isinstance(agent.loss, A0CLossTuned):
+            info_dict["alpha"] = agent.loss.alpha
+        # if agent.autotune:
+        #     info_dict["Entropy temperature [alpha] loss"] = episode_loss["alpha_loss"]
+        #     info_dict["Temperature parameter [alpha]"] = agent.alpha
 
         run.log(
             info_dict, step=ep,
