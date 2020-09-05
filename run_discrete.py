@@ -6,13 +6,13 @@ import git
 import wandb
 
 from alphazero.agents import AlphaZeroAgent
-from alphazero.losses import AlphaZeroLoss
+from alphazero.losses import A0CLoss, A0CLossTuned, AlphaZeroLoss
 from alphazero.buffers import ReplayBuffer
 from alphazero.helpers import store_actions
 from alphazero.helpers import is_atari_game
 from rl.make_game import make_game
 
-# TODO: Fix logging
+
 def run_discrete_agent(
     game: str,
     n_ep: int,
@@ -56,13 +56,14 @@ def run_discrete_agent(
         temperature=temp,
         c_uct=c,
         gamma=gamma,
-        loss=loss
+        loss=loss,
     )
 
     repo = git.Repo(search_parent_directories=True)
     config = {
         "Commit": repo.head.object.hexsha,
         "Environment": Env.unwrapped.spec.id,
+        "Environment seed": seed,
         "Discrete Env": agent.action_discrete,
         "MCTS_traces": agent.n_traces,
         "UCT constant": agent.c_uct,
@@ -70,12 +71,18 @@ def run_discrete_agent(
         "Softmax temperature": agent.temperature,
         "Network hidden layers": agent.n_hidden_layers,
         "Network hidden units": agent.n_hidden_units,
-        # "Value loss ratio": agent.value_loss_ratio,
         "Learning rate": agent.lr,
         "Batch size": buffer.batch_size,
         "Replay buffer size": buffer.max_size,
-        "Environment seed": seed,
+        "Policy Coefficient": agent.loss.policy_coeff,
+        "Value loss ratio": agent.loss.value_coeff,
     }
+    if isinstance(agent.loss, A0CLoss):
+        config["Log counts scaling factor [tau]"] = agent.loss.tau
+        config["Entropy Parameter alpha"] = agent.loss.alpha
+    elif isinstance(agent.loss, A0CLossTuned):
+        config["Log counts scaling factor [tau]"] = agent.loss.tau
+        config["Automatic Entropy tuning"] = True
 
     run = wandb.init(name="AlphaZero Discrete", project="a0c", config=config)
 
@@ -118,18 +125,15 @@ def run_discrete_agent(
         episode_returns.append(R)
 
         # Train
-        episode_loss = agent.train(buffer)
+        info_dict = agent.train(buffer)
+        info_dict["Episode reward"] = R
+        if isinstance(agent.loss, A0CLossTuned):
+            info_dict["alpha"] = agent.loss.alpha
 
         # agent.save_checkpoint(env=Env)
 
         run.log(
-            {
-                "Episode reward": R,
-                "Total loss": episode_loss["loss"],
-                "Policy loss": episode_loss["policy_loss"],
-                "Value loss": episode_loss["value_loss"],
-            },
-            step=ep,
+            info_dict, step=ep,
         )
 
         reward = np.round(R, 2)
