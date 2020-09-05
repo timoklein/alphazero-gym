@@ -1,20 +1,6 @@
-import torch
 import numpy as np
 from math import ceil
 from abc import ABC, abstractmethod
-
-
-class Action(ABC):
-
-    __slots__ = ("action", "parent_node", "W", "n", "Q", "child_node")
-
-    @abstractmethod
-    def add_child_node(self):
-        ...
-
-    @abstractmethod
-    def update(self):
-        ...
 
 
 class Node(ABC):
@@ -29,9 +15,30 @@ class Node(ABC):
         "child_actions",
     )
 
+    @property
     @abstractmethod
-    def update_visit_counts(self):
+    def has_children(self) -> bool:
         ...
+
+    @abstractmethod
+    def update_visit_counts(self) -> None:
+        ...
+
+class Action(ABC):
+
+    __slots__ = ("action", "parent_node", "W", "n", "Q", "child_node")
+
+    @abstractmethod
+    def add_child_node(self) -> Node:
+        ...
+
+    @abstractmethod
+    def update(self) -> None:
+        ...
+    
+    @property
+    def has_child(self) -> bool:
+        return self.child_node
 
 
 class NodeDiscrete(Node):
@@ -59,6 +66,10 @@ class NodeDiscrete(Node):
         self.num_actions = num_actions
         self.child_actions = None
         self.priors = None
+
+    @property
+    def has_children(self) -> bool:
+        return self.child_actions
 
     def update_visit_counts(self) -> None:
         """ update count on backward pass """
@@ -92,6 +103,10 @@ class NodeContinuous(Node):
             return True
 
         return False
+
+    @property
+    def has_children(self):
+        return self.child_actions
 
     @property
     def num_children(self):

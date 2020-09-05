@@ -121,7 +121,7 @@ class AlphaZeroAgent(Agent):
 
         states, actions, counts, V_target = obs
         states_tensor = torch.from_numpy(states).float()
-        values_tensor = torch.from_numpy(V_target).float()
+        values_tensor = torch.from_numpy(V_target).unsqueeze(dim=1).float()
 
         action_probs_tensor = F.softmax(torch.from_numpy(counts).float(), dim=-1)
 

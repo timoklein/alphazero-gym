@@ -29,6 +29,30 @@ class MCTS(ABC):
     def search(self):
         ...
 
+    def get_softz_value_target(self, counts: np.array) -> np.array:
+        Q = np.array([child_action.Q for child_action in self.root_node.child_actions])
+        return np.sum((counts / np.sum(counts)) * Q)
+
+    def get_a0c_value_target(self) -> np.array:
+        Q = np.array([child_action.Q for child_action in self.root_node.child_actions])
+        return Q.max()
+
+    def get_greedy_value_target(self) -> np.array:
+        node = self.root_node
+
+        while node.terminal and node.has_children:
+            counts = np.array(
+            [child_action.n for child_action in node.child_actions]
+            )
+            child = node.child_actions[argmax(counts)].child_node
+            if not child:
+                break
+            else:
+                node = child
+                
+        Q = np.array([child_action.Q for child_action in node.child_actions])
+        return Q.max()
+
     @staticmethod
     def selection(action: Action) -> Node:
         return action.child_node
@@ -49,7 +73,7 @@ class MCTS(ABC):
             _, reward, terminal, _ = mcts_env.step(action)
             V += reward
 
-        return np.array(V)
+        return V.unsqueeze(dim=0)
 
     @staticmethod
     def backprop(node: Node, gamma: float):
@@ -192,9 +216,8 @@ class MCTSDiscrete(MCTS):
         counts = np.array(
             [child_action.n for child_action in self.root_node.child_actions]
         )
-        Q = np.array([child_action.Q for child_action in self.root_node.child_actions])
-        V_target = np.sum((counts / np.sum(counts)) * Q)[None]
-        return self.root_node.state, actions, counts, V_target
+        V_target = self.get_greedy_value_target()
+        return self.root_node.state, actions.squeeze(), counts, V_target
 
     def forward(self, action: int, state: np.array) -> None:
         """ Move the root forward """
@@ -338,7 +361,6 @@ class MCTSContinuous(MCTS):
         counts = np.array(
             [child_action.n for child_action in self.root_node.child_actions]
         )
-        Q = np.array([child_action.Q for child_action in self.root_node.child_actions])
-        V_target = Q.max()
+        V_target = self.get_a0c_value_target()
         return self.root_node.state, actions.squeeze(), counts, V_target
 
