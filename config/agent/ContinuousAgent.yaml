@@ -2,6 +2,7 @@
 agent:
     _target_: alphazero.agents.ContinuousAgent
     network_cfg: ${network}
+    mcts_cfg: ${mcts}
     loss_cfg: ${loss}
     optimizer_cfg: ${network_optimizer}
     
@@ -27,3 +28,4 @@ mcts:
     kappa: 0.5
     gamma: 1
     c_uct: 0.05
+    root_state: null

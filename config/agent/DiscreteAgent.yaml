@@ -3,6 +3,7 @@ agent:
     _target_: alphazero.agents.DiscreteAgent
     is_atari: ??? # set later
     network_cfg: ${network}
+    mcts_cfg: ${mcts}
     loss_cfg: ${loss}
     optimizer_cfg: ${network_optimizer}
     temperature: 1.0
@@ -27,3 +28,4 @@ mcts:
     n_rollouts: 25
     gamma: 1
     c_uct: 1.5
+    root_state: null

@@ -20,6 +20,23 @@ PENDULUM_R_SCALE = 16.2736044
 
 
 class MCTS(ABC):
+    def __init__(
+        self,
+        model: torch.nn.Module,
+        n_rollouts: int,
+        c_uct: float,
+        gamma: float,
+        root_state: np.array,
+        root=None,
+    ) -> None:
+
+        self.root_node = root
+        self.root_state = root_state
+        self.model = model
+        self.n_rollouts = n_rollouts
+        self.c_uct = c_uct
+        self.gamma = gamma
+
     @abstractmethod
     def selectionUCT(self):
         ...
@@ -40,15 +57,13 @@ class MCTS(ABC):
         node = self.root_node
 
         while node.terminal and node.has_children:
-            counts = np.array(
-            [child_action.n for child_action in node.child_actions]
-            )
+            counts = np.array([child_action.n for child_action in node.child_actions])
             child = node.child_actions[argmax(counts)].child_node
             if not child:
                 break
             else:
                 node = child
-                
+
         Q = np.array([child_action.Q for child_action in node.child_actions])
         return Q.max()
 
@@ -100,14 +115,17 @@ class MCTSDiscrete(MCTS):
         root_state: np.array,
         root=None,
     ):
-        self.root_node = root
-        self.root_state = root_state
-        self.model = model
-        self.num_actions = num_actions
-        self.n_rollouts = n_rollouts
-        self.c_uct = c_uct
-        self.gamma = gamma
 
+        super().__init__(
+            model=model,
+            n_rollouts=n_rollouts,
+            c_uct=c_uct,
+            gamma=gamma,
+            root_state=root_state,
+            root=root,
+        )
+
+        self.num_actions = num_actions
         self.is_atari = is_atari
 
     def initialize_search(self) -> None:
@@ -148,9 +166,7 @@ class MCTSDiscrete(MCTS):
         ]
         node.priors = self.model.predict_pi(state).flatten()
 
-    def search(
-        self, Env: gym.Env, mcts_env: gym.Env, simulation: bool
-    ):
+    def search(self, Env: gym.Env, mcts_env: gym.Env, simulation: bool):
         """ Perform the MCTS search from the root """
 
         self.initialize_search()
@@ -254,14 +270,17 @@ class MCTSContinuous(MCTS):
         root_state: np.array,
         root=None,
     ):
-        self.root_node = root
-        self.root_state = root_state
-        self.model = model
-        self.n_rollouts = n_rollouts
-        self.c_uct = c_uct
+        super().__init__(
+            model=model,
+            n_rollouts=n_rollouts,
+            c_uct=c_uct,
+            gamma=gamma,
+            root_state=root_state,
+            root=root,
+        )
+
         self.c_pw = c_pw
         self.kappa = kappa
-        self.gamma = gamma
 
     def initialize_search(self) -> None:
         if self.root_node is None:
@@ -291,9 +310,7 @@ class MCTSContinuous(MCTS):
         new_child = ActionContinuous(action, parent_node=node, Q_init=node.V)
         node.child_actions.append(new_child)
 
-    def search(
-        self, Env: gym.Env, mcts_env: gym.Env, simulation: bool
-    ):
+    def search(self, Env: gym.Env, mcts_env: gym.Env, simulation: bool):
         """ Perform the MCTS search from the root """
 
         self.initialize_search()

@@ -3,8 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim import Adam
 
-from typing import Union, Dict, Any
-from abc import ABC, abstractmethod
+from typing import Dict, Any
+from abc import abstractmethod
 
 
 class Loss(nn.Module):
@@ -173,7 +173,9 @@ class A0CLossTuned(A0CLoss):
         self.alpha = self.log_alpha.exp().item()
         # for simplicity: Use the same optimizer settings as for the neural network
         self.a_optimizer = Adam([self.log_alpha], lr=lr)
-        super().__init__(self.tau, self.policy_coeff, self.alpha, self.value_coeff, self.reduction)
+        super().__init__(
+            self.tau, self.policy_coeff, self.alpha, self.value_coeff, self.reduction
+        )
 
     def _update_alpha(self, entropy: torch.Tensor) -> torch.Tensor:
         # we don't want to backprop through the network here

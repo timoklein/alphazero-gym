@@ -24,6 +24,7 @@ class Node(ABC):
     def update_visit_counts(self) -> None:
         ...
 
+
 class Action(ABC):
 
     __slots__ = ("action", "parent_node", "W", "n", "Q", "child_node")
@@ -40,7 +41,6 @@ class Action(ABC):
         self.n += 1
         self.W += R
         self.Q = self.W / self.n
-    
 
 
 class NodeDiscrete(Node):

@@ -48,7 +48,7 @@ def run_continuous_agent(cfg: DictConfig):
         state = Env.reset()
         R = 0.0  # Total return counter
 
-        agent.reset_mcts(cfg.mcts, root_state=state)
+        agent.reset_mcts(root_state=state)
         for t in range(cfg.max_episode_length):
             # MCTS step
             # run mcts and extract the root output
@@ -74,7 +74,7 @@ def run_continuous_agent(cfg: DictConfig):
                 break
             else:
                 # reset the mcts as we can't reuse the tree
-                agent.reset_mcts(cfg.mcts, root_state=state)
+                agent.reset_mcts(root_state=state)
 
         # store the total episode return
         episode_returns.append(R)

@@ -34,7 +34,9 @@ def run_discrete_agent(cfg: DictConfig):
     action_dim, action_discrete = check_space(Env.action_space)
     is_atari = is_atari_game(Env)
 
-    assert action_discrete == True, "Can't use discrete agent for continuous action spaces!"
+    assert (
+        action_discrete == True
+    ), "Can't use discrete agent for continuous action spaces!"
 
     # set config environment values
     cfg.network.state_dim = state_dim[0]
@@ -53,7 +55,7 @@ def run_discrete_agent(cfg: DictConfig):
             mcts_env.reset()
             mcts_env.seed(int(Env.seed()))
 
-        agent.reset_mcts(cfg.mcts, root_state=state)
+        agent.reset_mcts(root_state=state)
         for t in range(cfg.max_episode_length):
             # MCTS step
             # run mcts and extract the root output

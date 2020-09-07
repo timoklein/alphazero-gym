@@ -21,6 +21,21 @@ from .buffers import ReplayBuffer
 
 
 class Agent(ABC):
+    def __init__(
+        self,
+        network_cfg: DictConfig,
+        loss_cfg: DictConfig,
+        mcts_cfg: DictConfig,
+        optimizer_cfg: DictConfig,
+    ) -> None:
+
+        self.nn = hydra.utils.instantiate(network_cfg)
+        self.mcts = hydra.utils.instantiate(mcts_cfg, model=self.nn)
+        self.loss = hydra.utils.instantiate(loss_cfg)
+        self.optimizer = hydra.utils.instantiate(
+            optimizer_cfg, params=self.nn.parameters()
+        )
+
     @abstractmethod
     def act(self):
         ...
@@ -69,10 +84,9 @@ class Agent(ABC):
     def gamma(self) -> float:
         return self.mcts.gamma
 
-    def reset_mcts(self, mcts_cfg, root_state: np.array) -> None:
-        self.mcts = hydra.utils.instantiate(
-            mcts_cfg, model=self.nn, root_state=root_state
-        )
+    def reset_mcts(self, root_state: np.array) -> None:
+        self.mcts.root_node = None
+        self.mcts.root_state = root_state
 
     def train(self, buffer: ReplayBuffer) -> float:
         buffer.reshuffle()
@@ -92,20 +106,22 @@ class DiscreteAgent(Agent):
         self,
         is_atari: bool,
         network_cfg: DictConfig,
+        mcts_cfg: DictConfig,
         loss_cfg: DictConfig,
         optimizer_cfg: DictConfig,
         temperature: float,
     ) -> None:
+
+        super().__init__(
+            network_cfg=network_cfg,
+            loss_cfg=loss_cfg,
+            mcts_cfg=mcts_cfg,
+            optimizer_cfg=optimizer_cfg,
+        )
         self.is_atari = is_atari
 
         # initialize values
         self.temperature = temperature
-
-        self.nn = hydra.utils.instantiate(network_cfg)
-        self.loss = hydra.utils.instantiate(loss_cfg)
-        self.optimizer = hydra.utils.instantiate(
-            optimizer_cfg, params=self.nn.parameters()
-        )
 
     def act(
         self,
@@ -206,13 +222,18 @@ class DiscreteAgent(Agent):
 
 class ContinuousAgent(Agent):
     def __init__(
-        self, network_cfg: DictConfig, loss_cfg: DictConfig, optimizer_cfg: DictConfig,
+        self,
+        network_cfg: DictConfig,
+        mcts_cfg: DictConfig,
+        loss_cfg: DictConfig,
+        optimizer_cfg: DictConfig,
     ) -> None:
 
-        self.nn = hydra.utils.instantiate(network_cfg)
-        self.loss = hydra.utils.instantiate(loss_cfg)
-        self.optimizer = hydra.utils.instantiate(
-            optimizer_cfg, params=self.nn.parameters()
+        super().__init__(
+            network_cfg=network_cfg,
+            loss_cfg=loss_cfg,
+            mcts_cfg=mcts_cfg,
+            optimizer_cfg=optimizer_cfg,
         )
 
     @property
