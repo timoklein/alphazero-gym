@@ -1,0 +1,5 @@
+# @package _group_
+_target_: alphazero.losses.AlphaZeroLoss
+policy_coeff: 1
+value_coeff: 1
+reduction: mean

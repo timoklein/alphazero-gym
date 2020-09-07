@@ -1,0 +1,29 @@
+# @package _global_
+agent:
+    _target_: alphazero.agents.DiscreteAgent
+    is_atari: ??? # set later
+    network_cfg: ${network}
+    loss_cfg: ${loss}
+    optimizer_cfg: ${network_optimizer}
+    temperature: 1.0
+
+network:
+    _target_: alphazero.networks.NetworkDiscrete
+    state_dim: ??? # set later
+    action_dim: ??? # set later
+    n_hidden_layers: 1
+    n_hidden_units: 128
+
+network_optimizer:
+    _target_: torch.optim.RMSprop
+    lr: 0.001
+    alpha: 0.9
+    eps: 1e-07
+
+mcts:
+    _target_: alphazero.mcts.MCTSDiscrete
+    num_actions: ${network.action_dim}
+    is_atari: ${agent.is_atari}
+    n_rollouts: 25
+    gamma: 1
+    c_uct: 1.5

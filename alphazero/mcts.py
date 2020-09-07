@@ -94,6 +94,7 @@ class MCTSDiscrete(MCTS):
         model: torch.nn.Module,
         num_actions: int,
         is_atari: bool,
+        n_rollouts: int,
         c_uct: float,
         gamma: float,
         root_state: np.array,
@@ -103,6 +104,7 @@ class MCTSDiscrete(MCTS):
         self.root_state = root_state
         self.model = model
         self.num_actions = num_actions
+        self.n_rollouts = n_rollouts
         self.c_uct = c_uct
         self.gamma = gamma
 
@@ -147,7 +149,7 @@ class MCTSDiscrete(MCTS):
         node.priors = self.model.predict_pi(state).flatten()
 
     def search(
-        self, n_traces: int, Env: gym.Env, mcts_env: gym.Env, simulation: bool
+        self, Env: gym.Env, mcts_env: gym.Env, simulation: bool
     ):
         """ Perform the MCTS search from the root """
 
@@ -159,7 +161,7 @@ class MCTSDiscrete(MCTS):
         else:
             self.evaluation(self.root_node)
 
-        for i in range(n_traces):
+        for i in range(self.n_rollouts):
             # reset to root for new trace
             node = self.root_node
 
@@ -237,13 +239,14 @@ class MCTSDiscrete(MCTS):
             self.root_node = self.root_node.child_actions[action].child_node
 
 
+# TODO: Optimize reset MCTS method
 class MCTSContinuous(MCTS):
     """ MCTS object """
 
     def __init__(
         self,
         model: torch.nn.Module,
-        num_actions: int,
+        n_rollouts: int,
         c_uct: float,
         c_pw: float,
         kappa: float,
@@ -254,7 +257,7 @@ class MCTSContinuous(MCTS):
         self.root_node = root
         self.root_state = root_state
         self.model = model
-        self.num_actions = num_actions
+        self.n_rollouts = n_rollouts
         self.c_uct = c_uct
         self.c_pw = c_pw
         self.kappa = kappa
@@ -289,7 +292,7 @@ class MCTSContinuous(MCTS):
         node.child_actions.append(new_child)
 
     def search(
-        self, n_traces: int, Env: gym.Env, mcts_env: gym.Env, simulation: bool
+        self, Env: gym.Env, mcts_env: gym.Env, simulation: bool
     ):
         """ Perform the MCTS search from the root """
 
@@ -302,7 +305,7 @@ class MCTSContinuous(MCTS):
             self.add_value_estimate(self.root_node)
             self.add_pw_action(self.root_node)
 
-        for i in range(n_traces):
+        for i in range(self.n_rollouts):
             # reset to root for new trace
             node = self.root_node
 

@@ -3,15 +3,19 @@ import torch.nn.functional as F
 from torch.optim import RMSprop
 import numpy as np
 import gym
+import hydra
+from omegaconf.dictconfig import DictConfig
+
+
 from collections import defaultdict
 from pathlib import Path
 from datetime import datetime
 from typing import Dict, Tuple
 from abc import ABC, abstractmethod
 
+from torch.optim import optimizer
+
 from .networks import NetworkContinuous, NetworkDiscrete
-from .mcts import MCTSContinuous, MCTSDiscrete
-from .losses import Loss
 from .helpers import stable_normalizer
 from .buffers import ReplayBuffer
 
@@ -34,12 +38,41 @@ class Agent(ABC):
         ...
 
     @property
+    def action_dim(self) -> int:
+        return self.nn.action_dim
+
+    @property
+    def state_dim(self) -> int:
+        return self.nn.state_dim
+
+    @property
     def n_hidden_layers(self) -> int:
         return self.nn.n_hidden_layers
 
     @property
     def n_hidden_units(self) -> int:
         return self.nn.n_hidden_units
+
+    @property
+    def n_rollouts(self) -> int:
+        return self.mcts.n_rollouts
+
+    @property
+    def learning_rate(self) -> float:
+        return self.optimizer.lr
+
+    @property
+    def c_uct(self) -> float:
+        return self.mcts.c_uct
+
+    @property
+    def gamma(self) -> float:
+        return self.mcts.gamma
+
+    def reset_mcts(self, mcts_cfg, root_state: np.array) -> None:
+        self.mcts = hydra.utils.instantiate(
+            mcts_cfg, model=self.nn, root_state=root_state
+        )
 
     def train(self, buffer: ReplayBuffer) -> float:
         buffer.reshuffle()
@@ -54,61 +87,35 @@ class Agent(ABC):
         return running_loss
 
 
-# TODO: Add num_training epochs parameter
-
-
 class DiscreteAgent(Agent):
     def __init__(
         self,
-        state_dim: int,
-        action_dim: int,
         is_atari: bool,
-        n_hidden_layers: int,
-        n_hidden_units: int,
-        n_traces: int,
-        lr: float,
+        network_cfg: DictConfig,
+        loss_cfg: DictConfig,
+        optimizer_cfg: DictConfig,
         temperature: float,
-        c_uct: float,
-        gamma: float,
-        loss: Loss,
     ) -> None:
-
-        # get info about the environment
-        self.state_dim = state_dim
-        self.action_dim = action_dim
         self.is_atari = is_atari
-        
 
         # initialize values
-        self.n_traces = n_traces
-        self.c_uct = c_uct
-        self.gamma = gamma
-        self.lr = lr
         self.temperature = temperature
-        self.loss = loss
 
-        self.nn = NetworkDiscrete(
-            self.state_dim,
-            self.action_dim,
-            n_hidden_layers=n_hidden_layers,
-            n_hidden_units=n_hidden_units,
-        )
-        self.optimizer = RMSprop(self.nn.parameters(), lr=self.lr, alpha=0.9, eps=1e-07)
-
-    def reset_mcts(self, root_state: np.array) -> None:
-        self.mcts = MCTSDiscrete(
-            model=self.nn,
-            num_actions=self.nn.action_dim,
-            is_atari=self.is_atari,
-            gamma=self.gamma,
-            c_uct=self.c_uct,
-            root_state=root_state,
+        self.nn = hydra.utils.instantiate(network_cfg)
+        self.loss = hydra.utils.instantiate(loss_cfg)
+        self.optimizer = hydra.utils.instantiate(
+            optimizer_cfg, params=self.nn.parameters()
         )
 
     def act(
-        self, Env: gym.Env, mcts_env: gym.Env, simulation: bool = False, deterministic: bool = False
+        self,
+        Env: gym.Env,
+        mcts_env: gym.Env,
+        simulation: bool = False,
+        deterministic: bool = False,
     ) -> Tuple[int, np.array, np.array, np.array]:
-        self.mcts.search(n_traces=self.n_traces, Env=Env, mcts_env=mcts_env, simulation=simulation)
+
+        self.mcts.search(Env=Env, mcts_env=mcts_env, simulation=simulation)
         state, actions, counts, V = self.mcts.return_results()
 
         # Get MCTS policy
@@ -199,63 +206,24 @@ class DiscreteAgent(Agent):
 
 class ContinuousAgent(Agent):
     def __init__(
-        self,
-        state_dim: int,
-        action_dim: int,
-        act_limit: float,
-        n_hidden_layers: int,
-        n_hidden_units: int,
-        n_traces: int,
-        lr: float,
-        c_uct: float,
-        c_pw: float,
-        kappa: float,
-        gamma: float,
-        loss: Loss,
+        self, network_cfg: DictConfig, loss_cfg: DictConfig, optimizer_cfg: DictConfig,
     ) -> None:
-        # get info about the environment
-        self.state_dim = state_dim
-        self.action_dim = action_dim
-        self.act_limit = act_limit
 
-        # initialize values
-        self.n_traces = n_traces
-        self.c_uct = c_uct
-        self.c_pw = c_pw
-        self.kappa = kappa
-        self.gamma = gamma
-        self.lr = lr
-        self.loss = loss
-
-        # action_dim*2 -> Needs both location and scale for one dimension
-        self.nn = NetworkContinuous(
-            state_dim=self.state_dim,
-            action_dim=self.action_dim,
-            act_limit=self.act_limit,
-            n_hidden_layers=n_hidden_layers,
-            n_hidden_units=n_hidden_units,
-        )
-        self.n_optimizer = RMSprop(
-            self.nn.parameters(), lr=self.lr, alpha=0.9, eps=1e-07
+        self.nn = hydra.utils.instantiate(network_cfg)
+        self.loss = hydra.utils.instantiate(loss_cfg)
+        self.optimizer = hydra.utils.instantiate(
+            optimizer_cfg, params=self.nn.parameters()
         )
 
-    def reset_mcts(self, root_state: np.array) -> None:
-        self.mcts = MCTSContinuous(
-            model=self.nn,
-            num_actions=self.nn.action_dim,
-            gamma=self.gamma,
-            c_uct=self.c_uct,
-            c_pw=self.c_pw,
-            kappa=self.kappa,
-            root_state=root_state,
-        )
+    @property
+    def action_limit(self) -> float:
+        return self.nn.act_limit
 
     def act(
         self, Env: gym.Env, mcts_env: gym.Env, simulation: bool = False,
     ) -> Tuple[int, np.array, np.array, np.array]:
-        self.mcts.search(
-            n_traces=self.n_traces, Env=Env, mcts_env=mcts_env, simulation=simulation
-        )
+
+        self.mcts.search(Env=Env, mcts_env=mcts_env, simulation=simulation)
         state, actions, counts, V_hat = self.mcts.return_results()
 
         # select the action that was visited most
@@ -266,7 +234,7 @@ class ContinuousAgent(Agent):
     def update(
         self, obs: Tuple[np.array, np.array, np.array, np.array]
     ) -> Dict[str, float]:
-        self.n_optimizer.zero_grad()
+        self.optimizer.zero_grad()
 
         states, actions, counts, V_target = obs
 
@@ -288,7 +256,7 @@ class ContinuousAgent(Agent):
             V_hat=V_hat,
         )
         loss_dict["loss"].backward()
-        self.n_optimizer.step()
+        self.optimizer.step()
 
         info_dict = {key: float(value) for key, value in loss_dict.items()}
         return info_dict
@@ -309,10 +277,8 @@ class ContinuousAgent(Agent):
         self.nn.load_state_dict(checkpoint["model_state_dict"])
 
         self.lr = checkpoint["network_optimizer_lr"]
-        self.n_optimizer = RMSprop(
-            self.nn.parameters(), lr=self.lr, alpha=0.9, eps=1e-07
-        )
-        self.n_optimizer.load_state_dict(checkpoint["network_optimizer_state_dict"])
+        self.optimizer = RMSprop(self.nn.parameters(), lr=self.lr, alpha=0.9, eps=1e-07)
+        self.optimizer.load_state_dict(checkpoint["network_optimizer_state_dict"])
 
         self.n_traces = checkpoint["agent"]["n_traces"]
         self.c_uct = checkpoint["agent"]["c_uct"]
@@ -351,8 +317,8 @@ class ContinuousAgent(Agent):
                 "n_hidden_layers": self.nn.n_hidden_layers,
                 "n_hidden_units": self.nn.n_hidden_units,
                 "model_state_dict": self.nn.state_dict(),
-                "network_optimizer_lr": self.n_optimizer.param_groups[0]["lr"],
-                "network_optimizer_state_dict": self.n_optimizer.state_dict(),
+                "network_optimizer_lr": self.optimizer.param_groups[0]["lr"],
+                "network_optimizer_state_dict": self.optimizer.state_dict(),
                 "agent": {
                     "n_traces": self.n_traces,
                     "c_uct": self.c_uct,

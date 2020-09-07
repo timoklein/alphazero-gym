@@ -26,7 +26,7 @@ Base implementation.
 - [x] Factor out loss objects and use torch Categorical in Discrete Net
 - [x] Refactor discrete version to always return actions as well
 - [x] Refactor buffer into more efficient version
-- [ ] Remove the argparse crap and use Hydra instead
+- [x] Remove the argparse crap and use Hydra instead
 - [ ] Enable GPU training.
 
 
