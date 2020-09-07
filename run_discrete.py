@@ -9,7 +9,7 @@ from alphazero.agents import DiscreteAgent
 from alphazero.losses import A0CLoss, A0CLossTuned, AlphaZeroLoss
 from alphazero.buffers import ReplayBuffer
 from alphazero.helpers import store_actions
-from alphazero.helpers import is_atari_game
+from alphazero.helpers import check_space, is_atari_game
 from rl.make_game import make_game
 
 
@@ -46,9 +46,18 @@ def run_discrete_agent(
     buffer = ReplayBuffer(max_size=buffer_size, batch_size=batch_size)
     t_total = 0  # total steps
 
+    # get environment info
+    state_dim, _ = check_space(Env.observation_space)
+    action_dim, action_discrete = check_space(Env.action_space)
+    is_atari = is_atari_game(Env)
+
+    assert action_discrete == True, "Can't use discrete agent for continuous action spaces!"
+
     loss = AlphaZeroLoss(1, value_loss_ratio, "mean")
     agent = DiscreteAgent(
-        Env,
+        state_dim=state_dim[0],
+        action_dim=action_dim,
+        is_atari=is_atari,
         n_hidden_layers=n_hidden_layers,
         n_hidden_units=n_hidden_units,
         n_traces=n_traces,
@@ -64,7 +73,6 @@ def run_discrete_agent(
         "Commit": repo.head.object.hexsha,
         "Environment": Env.unwrapped.spec.id,
         "Environment seed": seed,
-        "Discrete Env": agent.action_discrete,
         "MCTS_traces": agent.n_traces,
         "UCT constant": agent.c_uct,
         "Discount factor": agent.gamma,

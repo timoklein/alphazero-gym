@@ -8,7 +8,7 @@ import wandb
 from alphazero.agents import ContinuousAgent
 from alphazero.losses import A0CLoss, A0CLossTuned
 from alphazero.buffers import ReplayBuffer
-from alphazero.helpers import store_actions
+from alphazero.helpers import check_space, is_atari_game, store_actions
 from rl.make_game import make_game
 
 # TODO: Fix logging
@@ -46,8 +46,15 @@ def run_continuous_agent(
     buffer = ReplayBuffer(max_size=buffer_size, batch_size=batch_size)
     t_total = 0  # total steps
 
+    # get environment info
+    state_dim, _ = check_space(Env.observation_space)
+    action_dim, action_discrete = check_space(Env.action_space)
+    act_limit = Env.action_space.shape[0]
+
+    assert action_discrete == False, "Using continuous agent for a discrete action space!"
+
     loss = A0CLossTuned(
-        action_dim=Env.action_space.shape[0],
+        action_dim=action_dim[0],
         lr=lr,
         tau=tau,
         policy_coeff=1,
@@ -56,7 +63,9 @@ def run_continuous_agent(
     )
 
     agent = ContinuousAgent(
-        Env,
+        state_dim=state_dim[0],
+        action_dim=action_dim[0],
+        act_limit=act_limit,
         n_hidden_layers=n_hidden_layers,
         n_hidden_units=n_hidden_units,
         n_traces=n_traces,
@@ -73,7 +82,6 @@ def run_continuous_agent(
         "Commit": repo.head.object.hexsha,
         "Environment": Env.unwrapped.spec.id,
         "Environment seed": seed,
-        "Discrete Env": agent.action_discrete,
         "MCTS_traces": agent.n_traces,
         "UCT constant": agent.c_uct,
         "Progressive widening factor [c_pw]": agent.c_pw,

@@ -12,7 +12,7 @@ from abc import ABC, abstractmethod
 from .networks import NetworkContinuous, NetworkDiscrete
 from .mcts import MCTSContinuous, MCTSDiscrete
 from .losses import Loss
-from .helpers import is_atari_game, check_space, stable_normalizer
+from .helpers import stable_normalizer
 from .buffers import ReplayBuffer
 
 
@@ -60,7 +60,9 @@ class Agent(ABC):
 class DiscreteAgent(Agent):
     def __init__(
         self,
-        Env: gym.Env,
+        state_dim: int,
+        action_dim: int,
+        is_atari: bool,
         n_hidden_layers: int,
         n_hidden_units: int,
         n_traces: int,
@@ -70,10 +72,12 @@ class DiscreteAgent(Agent):
         gamma: float,
         loss: Loss,
     ) -> None:
+
         # get info about the environment
-        state_dim, self.state_discrete = check_space(Env.observation_space)
-        self.state_dim = state_dim[0]
-        self.action_dim, self.action_discrete = check_space(Env.action_space)
+        self.state_dim = state_dim
+        self.action_dim = action_dim
+        self.is_atari = is_atari
+        
 
         # initialize values
         self.n_traces = n_traces
@@ -82,8 +86,6 @@ class DiscreteAgent(Agent):
         self.lr = lr
         self.temperature = temperature
         self.loss = loss
-
-        self.is_atari = is_atari_game(Env)
 
         self.nn = NetworkDiscrete(
             self.state_dim,
@@ -198,7 +200,9 @@ class DiscreteAgent(Agent):
 class ContinuousAgent(Agent):
     def __init__(
         self,
-        Env: gym.Env,
+        state_dim: int,
+        action_dim: int,
+        act_limit: float,
         n_hidden_layers: int,
         n_hidden_units: int,
         n_traces: int,
@@ -210,10 +214,9 @@ class ContinuousAgent(Agent):
         loss: Loss,
     ) -> None:
         # get info about the environment
-        state_dim, self.state_discrete = check_space(Env.observation_space)
-        self.state_dim = state_dim[0]
-        action_dim, self.action_discrete = check_space(Env.action_space)
-        self.action_dim = action_dim[0]
+        self.state_dim = state_dim
+        self.action_dim = action_dim
+        self.act_limit = act_limit
 
         # initialize values
         self.n_traces = n_traces
@@ -228,7 +231,7 @@ class ContinuousAgent(Agent):
         self.nn = NetworkContinuous(
             state_dim=self.state_dim,
             action_dim=self.action_dim,
-            act_limit=Env.action_space.high[0],
+            act_limit=self.act_limit,
             n_hidden_layers=n_hidden_layers,
             n_hidden_units=n_hidden_units,
         )
