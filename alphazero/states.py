@@ -32,13 +32,15 @@ class Action(ABC):
     def add_child_node(self) -> Node:
         ...
 
-    @abstractmethod
-    def update(self) -> None:
-        ...
-    
     @property
     def has_child(self) -> bool:
         return self.child_node
+
+    def update(self, R: float) -> None:
+        self.n += 1
+        self.W += R
+        self.Q = self.W / self.n
+    
 
 
 class NodeDiscrete(Node):
@@ -123,9 +125,9 @@ class ActionDiscrete(Action):
     def __init__(self, action: int, parent_node: NodeDiscrete, Q_init: float) -> None:
         self.action = action
         self.parent_node = parent_node
+        self.Q = Q_init
         self.W = 0.0
         self.n = 0
-        self.Q = Q_init
 
         self.child_node = None
 
@@ -147,9 +149,9 @@ class ActionContinuous(Action):
     def __init__(self, action: np.array, parent_node: NodeContinuous, Q_init: float):
         self.action = action
         self.parent_node = parent_node
+        self.Q = Q_init
         self.W = 0.0
         self.n = 0
-        self.Q = Q_init
 
         self.child_node = None
 
@@ -158,9 +160,4 @@ class ActionContinuous(Action):
     ) -> NodeContinuous:
         self.child_node = NodeContinuous(state, r, terminal, self)
         return self.child_node
-
-    def update(self, R: float) -> None:
-        self.n += 1
-        self.W += R
-        self.Q = self.W / self.n
 
