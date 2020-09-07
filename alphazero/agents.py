@@ -33,6 +33,14 @@ class Agent(ABC):
     def save_checkpoint(self):
         ...
 
+    @property
+    def n_hidden_layers(self) -> int:
+        return self.nn.n_hidden_layers
+
+    @property
+    def n_hidden_units(self) -> int:
+        return self.nn.n_hidden_units
+
     def train(self, buffer: ReplayBuffer) -> float:
         buffer.reshuffle()
         running_loss = defaultdict(float)
@@ -85,14 +93,6 @@ class DiscreteAgent(Agent):
         )
         self.optimizer = RMSprop(self.nn.parameters(), lr=self.lr, alpha=0.9, eps=1e-07)
 
-    @property
-    def n_hidden_layers(self) -> int:
-        return self.nn.n_hidden_layers
-
-    @property
-    def n_hidden_units(self) -> int:
-        return self.nn.n_hidden_units
-
     def reset_mcts(self, root_state: np.array) -> None:
         self.mcts = MCTSDiscrete(
             model=self.nn,
@@ -104,13 +104,17 @@ class DiscreteAgent(Agent):
         )
 
     def act(
-        self, Env: gym.Env, mcts_env: gym.Env, deterministic: bool = False
+        self, Env: gym.Env, mcts_env: gym.Env, simulation: bool = False, deterministic: bool = False
     ) -> Tuple[int, np.array, np.array, np.array]:
-        self.mcts.search(n_traces=self.n_traces, Env=Env, mcts_env=mcts_env)
+        self.mcts.search(n_traces=self.n_traces, Env=Env, mcts_env=mcts_env, simulation=simulation)
         state, actions, counts, V = self.mcts.return_results()
+
+        # Get MCTS policy
         pi = stable_normalizer(counts, self.temperature)
+
         # sample an action from the policy or pick best action if deterministic
         action = pi.argmax() if deterministic else np.random.choice(len(pi), p=pi)
+
         return action, state, actions, counts, V
 
     def mcts_forward(self, action: int, node: np.array) -> None:
@@ -232,14 +236,6 @@ class ContinuousAgent(Agent):
             self.nn.parameters(), lr=self.lr, alpha=0.9, eps=1e-07
         )
 
-    @property
-    def n_hidden_layers(self) -> int:
-        return self.nn.n_hidden_layers
-
-    @property
-    def n_hidden_units(self) -> int:
-        return self.nn.n_hidden_units
-
     def reset_mcts(self, root_state: np.array) -> None:
         self.mcts = MCTSContinuous(
             model=self.nn,
@@ -251,12 +247,11 @@ class ContinuousAgent(Agent):
             root_state=root_state,
         )
 
-    # TODO: Pass deterministic acting to the neural network instead of using it like this
     def act(
-        self, Env: gym.Env, mcts_env: gym.Env, deterministic: bool = True
+        self, Env: gym.Env, mcts_env: gym.Env, simulation: bool = False,
     ) -> Tuple[int, np.array, np.array, np.array]:
         self.mcts.search(
-            n_traces=self.n_traces, Env=Env, mcts_env=mcts_env, simulation=False
+            n_traces=self.n_traces, Env=Env, mcts_env=mcts_env, simulation=simulation
         )
         state, actions, counts, V_hat = self.mcts.return_results()
 

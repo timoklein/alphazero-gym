@@ -19,7 +19,6 @@ from .helpers import copy_atari_state, restore_atari_state, argmax
 PENDULUM_R_SCALE = 16.2736044
 
 
-# TODO: Put different estimation functions for V_target in here
 class MCTS(ABC):
     @abstractmethod
     def selectionUCT(self):
@@ -87,8 +86,6 @@ class MCTS(ABC):
             node.update_visit_counts()
 
 
-# TODO: Implement different kinds of return methods
-# TODO: Return counts in the discrete version as well
 class MCTSDiscrete(MCTS):
     """ MCTS object """
 
@@ -150,7 +147,7 @@ class MCTSDiscrete(MCTS):
         node.priors = self.model.predict_pi(state).flatten()
 
     def search(
-        self, n_traces: int, Env: gym.Env, mcts_env: gym.Env, simulation: bool = False
+        self, n_traces: int, Env: gym.Env, mcts_env: gym.Env, simulation: bool
     ):
         """ Perform the MCTS search from the root """
 
@@ -291,9 +288,8 @@ class MCTSContinuous(MCTS):
         new_child = ActionContinuous(action, parent_node=node, Q_init=node.V)
         node.child_actions.append(new_child)
 
-    # TODO: This should be able to determinstically select the best action with the nn
     def search(
-        self, n_traces: int, Env: gym.Env, mcts_env: gym.Env, simulation: bool = False
+        self, n_traces: int, Env: gym.Env, mcts_env: gym.Env, simulation: bool
     ):
         """ Perform the MCTS search from the root """
 
