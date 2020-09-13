@@ -26,10 +26,12 @@ class MCTS(ABC):
         n_rollouts: int,
         c_uct: float,
         gamma: float,
+        device: str,
         root_state: np.array,
         root=None,
     ) -> None:
 
+        self.device = torch.device(device)
         self.root_node = root
         self.root_state = root_state
         self.model = model
@@ -112,6 +114,7 @@ class MCTSDiscrete(MCTS):
         n_rollouts: int,
         c_uct: float,
         gamma: float,
+        device: str,
         root_state: np.array,
         root=None,
     ):
@@ -121,6 +124,7 @@ class MCTSDiscrete(MCTS):
             n_rollouts=n_rollouts,
             c_uct=c_uct,
             gamma=gamma,
+            device=device,
             root_state=root_state,
             root=root,
         )
@@ -148,7 +152,7 @@ class MCTSDiscrete(MCTS):
             snapshot = copy_atari_state(Env)
 
     def evaluation(self, node: NodeDiscrete, V: float = None) -> None:
-        state = torch.from_numpy(node.state[None,]).float()
+        state = torch.from_numpy(node.state[None,]).float().to(self.device)
 
         # only use the neural network to estimate the value if we have none
         if not V:
@@ -266,6 +270,7 @@ class MCTSContinuous(MCTS):
         c_pw: float,
         kappa: float,
         gamma: float,
+        device: str,
         root_state: np.array,
         root=None,
     ):
@@ -274,6 +279,7 @@ class MCTSContinuous(MCTS):
             n_rollouts=n_rollouts,
             c_uct=c_uct,
             gamma=gamma,
+            device=device,
             root_state=root_state,
             root=root,
         )
@@ -296,7 +302,7 @@ class MCTSContinuous(MCTS):
         if mcts_env:
             node.V = self.simulation(mcts_env)
         else:
-            state = torch.from_numpy(node.state[None,]).float()
+            state = torch.from_numpy(node.state[None,]).float().to(self.device)
             node.V = (
                 np.squeeze(self.model.predict_V(state))
                 if not node.terminal
@@ -304,7 +310,7 @@ class MCTSContinuous(MCTS):
             )
 
     def add_pw_action(self, node: NodeContinuous) -> None:
-        state = torch.from_numpy(node.state[None,]).float()
+        state = torch.from_numpy(node.state[None,]).float().to(self.device)
         action = self.model.sample_action(state)
         new_child = ActionContinuous(action, parent_node=node, Q_init=node.V)
         node.child_actions.append(new_child)

@@ -29,11 +29,13 @@ class Agent(ABC):
         mcts_cfg: DictConfig,
         optimizer_cfg: DictConfig,
         grad_clip: float,
+        device: str,
     ) -> None:
 
-        self.nn = hydra.utils.instantiate(network_cfg)
+        self.device = torch.device(device)
+        self.nn = hydra.utils.instantiate(network_cfg).to(self.device)
         self.mcts = hydra.utils.instantiate(mcts_cfg, model=self.nn)
-        self.loss = hydra.utils.instantiate(loss_cfg)
+        self.loss = hydra.utils.instantiate(loss_cfg).to(self.device)
         self.optimizer = hydra.utils.instantiate(
             optimizer_cfg, params=self.nn.parameters()
         )
@@ -115,6 +117,7 @@ class DiscreteAgent(Agent):
         optimizer_cfg: DictConfig,
         grad_clip: float,
         temperature: float,
+        device: str,
     ) -> None:
 
         super().__init__(
@@ -123,6 +126,7 @@ class DiscreteAgent(Agent):
             mcts_cfg=mcts_cfg,
             optimizer_cfg=optimizer_cfg,
             grad_clip=grad_clip,
+            device=device,
         )
         self.is_atari = is_atari
 
@@ -155,10 +159,14 @@ class DiscreteAgent(Agent):
         self.optimizer.zero_grad()
 
         states, actions, counts, V_target = obs
-        states_tensor = torch.from_numpy(states).float()
-        values_tensor = torch.from_numpy(V_target).unsqueeze(dim=1).float()
+        states_tensor = torch.from_numpy(states).float().to(self.device)
+        values_tensor = (
+            torch.from_numpy(V_target).unsqueeze(dim=1).float().to(self.device)
+        )
 
-        action_probs_tensor = F.softmax(torch.from_numpy(counts).float(), dim=-1)
+        action_probs_tensor = F.softmax(torch.from_numpy(counts).float(), dim=-1).to(
+            self.device
+        )
 
         # TODO: Needs to work for both losses
         pi_logits, V_hat = self.nn(states_tensor)
@@ -238,6 +246,7 @@ class ContinuousAgent(Agent):
         loss_cfg: DictConfig,
         optimizer_cfg: DictConfig,
         grad_clip: float,
+        device: str,
     ) -> None:
 
         super().__init__(
@@ -246,6 +255,7 @@ class ContinuousAgent(Agent):
             mcts_cfg=mcts_cfg,
             optimizer_cfg=optimizer_cfg,
             grad_clip=grad_clip,
+            device=device,
         )
 
     @property
@@ -271,11 +281,13 @@ class ContinuousAgent(Agent):
 
         states, actions, counts, V_target = obs
 
-        actions_tensor = torch.from_numpy(actions).float()
-        states_tensor = torch.from_numpy(states).float()
-        values_tensor = torch.from_numpy(V_target).unsqueeze(dim=1).float()
+        actions_tensor = torch.from_numpy(actions).float().to(self.device)
+        states_tensor = torch.from_numpy(states).float().to(self.device)
+        values_tensor = (
+            torch.from_numpy(V_target).unsqueeze(dim=1).float().to(self.device)
+        )
 
-        log_counts_tensor = torch.log(torch.from_numpy(counts).float())
+        log_counts_tensor = torch.log(torch.from_numpy(counts).float()).to(self.device)
 
         log_probs, entropy, V_hat = self.nn.get_train_data(
             states_tensor, actions_tensor

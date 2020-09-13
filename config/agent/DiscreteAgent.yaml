@@ -8,6 +8,7 @@ agent:
     optimizer_cfg: ${network_optimizer}
     grad_clip: 0
     temperature: 1.0
+    device: ${device}
 
 network:
     _target_: alphazero.networks.NetworkDiscrete
@@ -31,4 +32,5 @@ mcts:
     n_rollouts: 25
     gamma: 1
     c_uct: 1.5
+    device: ${device}
     root_state: null

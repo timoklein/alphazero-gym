@@ -32,7 +32,7 @@ Base implementation.
 - [ ] Add Gaussian Mixture option to continuous policy network.
 - [ ] Properly implement diagonal multivariate Gaussian.
 - [ ] Fix model saving and loading using the config for instantiation.
-- [ ] Enable GPU training.
+- [x] Enable GPU training.
 
 
 ## Possible Enhancements to try

@@ -6,6 +6,7 @@ agent:
     loss_cfg: ${loss}
     optimizer_cfg: ${network_optimizer}
     grad_clip: 0
+    device: ${device}
     
 
 network:
@@ -31,4 +32,5 @@ mcts:
     kappa: 0.5
     gamma: 1
     c_uct: 0.05
+    device: ${device}
     root_state: null
