@@ -1,6 +1,7 @@
 import torch
 import torch.nn.functional as F
 from torch.optim import RMSprop
+from torch.nn.utils import clip_grad_norm
 import numpy as np
 import gym
 import hydra
@@ -27,6 +28,7 @@ class Agent(ABC):
         loss_cfg: DictConfig,
         mcts_cfg: DictConfig,
         optimizer_cfg: DictConfig,
+        grad_clip: float,
     ) -> None:
 
         self.nn = hydra.utils.instantiate(network_cfg)
@@ -35,6 +37,8 @@ class Agent(ABC):
         self.optimizer = hydra.utils.instantiate(
             optimizer_cfg, params=self.nn.parameters()
         )
+
+        self.clip = grad_clip
 
     @abstractmethod
     def act(self):
@@ -109,6 +113,7 @@ class DiscreteAgent(Agent):
         mcts_cfg: DictConfig,
         loss_cfg: DictConfig,
         optimizer_cfg: DictConfig,
+        grad_clip: float,
         temperature: float,
     ) -> None:
 
@@ -117,6 +122,7 @@ class DiscreteAgent(Agent):
             loss_cfg=loss_cfg,
             mcts_cfg=mcts_cfg,
             optimizer_cfg=optimizer_cfg,
+            grad_clip=grad_clip,
         )
         self.is_atari = is_atari
 
@@ -158,6 +164,10 @@ class DiscreteAgent(Agent):
         pi_logits, V_hat = self.nn(states_tensor)
         loss_dict = self.loss(pi_logits, action_probs_tensor, V_hat, values_tensor)
         loss_dict["loss"].backward()
+
+        if self.clip:
+            clip_grad_norm(self.nn.parameters(), self.clip)
+
         self.optimizer.step()
 
         info_dict = {key: float(value) for key, value in loss_dict.items()}
@@ -227,6 +237,7 @@ class ContinuousAgent(Agent):
         mcts_cfg: DictConfig,
         loss_cfg: DictConfig,
         optimizer_cfg: DictConfig,
+        grad_clip: float,
     ) -> None:
 
         super().__init__(
@@ -234,6 +245,7 @@ class ContinuousAgent(Agent):
             loss_cfg=loss_cfg,
             mcts_cfg=mcts_cfg,
             optimizer_cfg=optimizer_cfg,
+            grad_clip=grad_clip,
         )
 
     @property
@@ -277,6 +289,10 @@ class ContinuousAgent(Agent):
             V_hat=V_hat,
         )
         loss_dict["loss"].backward()
+
+        if self.clip:
+            clip_grad_norm(self.nn.parameters(), self.clip)
+
         self.optimizer.step()
 
         info_dict = {key: float(value) for key, value in loss_dict.items()}

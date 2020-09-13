@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.nn.utils import clip_grad_norm
 from torch.optim import Adam
 
 from typing import Dict, Any
@@ -160,11 +161,13 @@ class A0CLossTuned(A0CLoss):
         policy_coeff: float,
         value_coeff: float,
         reduction: str,
+        grad_clip: float,
     ) -> None:
         self.tau = tau
         self.policy_coeff = policy_coeff
         self.value_coeff = value_coeff
         self.reduction = reduction
+        self.clip = grad_clip
 
         # set target entropy to -|A|
         self.target_entropy = -action_dim
@@ -185,6 +188,10 @@ class A0CLossTuned(A0CLoss):
         # optimize and set values
         self.a_optimizer.zero_grad()
         alpha_loss.backward()
+
+        if self.clip:
+            clip_grad_norm(self.log_alpha, self.clip)
+
         self.a_optimizer.step()
         self.alpha = self.log_alpha.exp().item()
         return alpha_loss.detach().cpu()

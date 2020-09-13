@@ -255,7 +255,6 @@ class MCTSDiscrete(MCTS):
             self.root_node = self.root_node.child_actions[action].child_node
 
 
-# TODO: Optimize reset MCTS method
 class MCTSContinuous(MCTS):
     """ MCTS object """
 

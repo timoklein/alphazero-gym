@@ -5,6 +5,7 @@ agent:
     mcts_cfg: ${mcts}
     loss_cfg: ${loss}
     optimizer_cfg: ${network_optimizer}
+    grad_clip: 0
     
 
 network:
@@ -18,6 +19,8 @@ network:
 network_optimizer:
     _target_: torch.optim.RMSprop
     lr: 0.001
+    momentum: 0
+    weight_decay: 0
     alpha: 0.9
     eps: 1e-07
 

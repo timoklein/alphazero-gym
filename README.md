@@ -27,6 +27,11 @@ Base implementation.
 - [x] Refactor discrete version to always return actions as well
 - [x] Refactor buffer into more efficient version
 - [x] Remove the argparse crap and use Hydra instead
+- [x] Add option to clip gradients.
+- [x] Add weight decay
+- [ ] Add Gaussian Mixture option to continuous policy network.
+- [ ] Properly implement diagonal multivariate Gaussian.
+- [ ] Fix model saving and loading using the config for instantiation.
 - [ ] Enable GPU training.
 
 
