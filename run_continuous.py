@@ -54,6 +54,7 @@ def run_continuous_agent(cfg: DictConfig):
         "Progressive widening exponent [kappa]": cfg.mcts.kappa,
         "Network hidden layers": cfg.network.n_hidden_layers,
         "Network hidden units": cfg.network.n_hidden_units,
+        "Number of GMM components": cfg.network.num_components,
         "Learning rate": cfg.network_optimizer.lr,
         "Log counts scaling factor [tau]": cfg.agent.loss_cfg.tau,
         "Policy Coefficient": cfg.agent.loss_cfg.policy_coeff,

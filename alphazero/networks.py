@@ -3,7 +3,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.distributions import Normal, Categorical
+from torch.distributions import Normal, Categorical, MixtureSameFamily
 
 
 class NetworkDiscrete(nn.Module):
@@ -43,12 +43,13 @@ class NetworkDiscrete(nn.Module):
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         pi_logits, V_hat = self.forward(states)
 
-        pi_hat = Categorical(F.softmax(pi_logits, dim=-1))
-        log_probs = torch.cat(
-            [pi_hat.log_prob(action_b).unsqueeze(dim=1) for action_b in actions.t()],
-            dim=1,
+        num_actions = actions.shape[1]
+
+        pi_hat = Categorical(
+            F.softmax(pi_logits, dim=-1).unsqueeze(dim=0).repeat((num_actions, 1, 1))
         )
-        entropy = -pi_hat.entropy()
+        log_probs = pi_hat.log_prob(actions.t()).t()
+        entropy = -pi_hat.entropy().mean(dim=0)
 
         return log_probs, entropy, V_hat
 
@@ -79,6 +80,7 @@ class NetworkContinuous(nn.Module):
         act_limit: float,
         n_hidden_layers: int,
         n_hidden_units: int,
+        num_components: int,
         log_max: int = 2,
         log_min: int = -5,
     ) -> None:
@@ -86,7 +88,7 @@ class NetworkContinuous(nn.Module):
 
         self.state_dim = state_dim
         self.action_dim = action_dim
-
+        self.num_components = num_components
         self.act_limit = act_limit
 
         self.LOG_STD_MAX = log_max
@@ -104,8 +106,11 @@ class NetworkContinuous(nn.Module):
 
         self.hidden = nn.Sequential(*layers)
 
-        self.mean_head = nn.Linear(n_hidden_units, self.action_dim)
-        self.std_head = nn.Linear(n_hidden_units, self.action_dim)
+        self.mean_head = nn.Linear(n_hidden_units, self.action_dim * num_components)
+        self.std_head = nn.Linear(n_hidden_units, self.action_dim * num_components)
+        if 1 < self.num_components:
+            self.comp_head = nn.Linear(n_hidden_units, num_components)
+
         self.value_head = nn.Linear(n_hidden_units, 1)
 
     def forward(
@@ -120,40 +125,55 @@ class NetworkContinuous(nn.Module):
         # See SpinningUp SAC -> Pre-squashing of distribution
         log_std = torch.clamp(log_std, self.LOG_STD_MIN, self.LOG_STD_MAX)
         std = log_std.exp()
-        return mean, std, V_hat
+        if 1 < self.num_components:
+            coeffs = torch.softmax(self.comp_head(x), dim=-1)
+            return mean, std, coeffs, V_hat
+        else:
+            return mean, std, V_hat
 
     def get_train_data(
         self, states: torch.Tensor, actions: torch.Tensor
     ) -> Tuple[torch.Tensor, torch.Tensor]:
-        mean, std, V_hat = self.forward(states)
 
-        normal = Normal(mean, std)
+        if 1 < self.num_components:
+            num_actions = actions.shape[1]
+            mean, std, probs, V_hat = self.forward(states)
+            coeffs = Categorical(probs.unsqueeze(dim=0).repeat((num_actions, 1, 1)))
+            normal = Normal(
+                mean.unsqueeze(dim=0).repeat((num_actions, 1, 1)),
+                std.unsqueeze(dim=0).repeat((num_actions, 1, 1)),
+            )
+            gmm = MixtureSameFamily(coeffs, normal)
+            log_probs = gmm.log_prob(actions.t()).t()
+        else:
+            mean, std, V_hat = self.forward(states)
+            normal = Normal(mean, std)
+            log_probs = normal.log_prob(actions)
 
-        log_probs = normal.log_prob(actions)
         # correct for action bound squashing without summing
         logp_policy = log_probs - (2 * (np.log(2) - actions - F.softplus(-2 * actions)))
 
         entropy = log_probs.sum(axis=-1)
         entropy -= (2 * (np.log(2) - actions - F.softplus(-2 * actions))).sum(axis=1)
-
         return logp_policy, entropy, V_hat
 
     @torch.no_grad()
-    def sample_action(self, x: torch.Tensor, deterministic: bool = False) -> np.array:
+    def sample_action(self, x: torch.Tensor) -> np.array:
         self.eval()
         x = F.elu(self.in_layer(x))
         x = self.hidden(x)
         mean = self.mean_head(x)
         log_std = self.std_head(x)
-
         std = log_std.exp()
 
-        normal = Normal(mean, std)
-
-        # Enable deterministic action if in eval mode
-        if deterministic:
-            action = mean
+        if 1 < self.num_components:
+            probs = torch.softmax(self.comp_head(x), dim=-1)
+            coeffs = Categorical(probs)
+            normal = Normal(mean, std)
+            gmm = MixtureSameFamily(coeffs, normal)
+            action = gmm.sample()
         else:
+            normal = Normal(mean, std)
             action = normal.sample()
 
         # Enfore action bounds after sampling

@@ -14,6 +14,7 @@ network:
     state_dim: ??? # set later
     action_dim: ??? # set later
     act_limit: ??? # set later
+    num_components: 2
     n_hidden_layers: 1
     n_hidden_units: 128
 

@@ -149,7 +149,10 @@ class DiscreteAgent(Agent):
         self.mcts.forward(action, node)
 
     def update(self, obs: Tuple[np.array, np.array, np.array]) -> Dict[str, float]:
-        self.optimizer.zero_grad()
+
+        # zero out gradients
+        for param in self.nn.parameters():
+            param.grad = None
 
         states, actions, counts, V_target = obs
         states_tensor = torch.from_numpy(states).float().to(self.device)
@@ -233,7 +236,10 @@ class ContinuousAgent(Agent):
     def update(
         self, obs: Tuple[np.array, np.array, np.array, np.array]
     ) -> Dict[str, float]:
-        self.optimizer.zero_grad()
+
+        # zero out gradients
+        for param in self.nn.parameters():
+            param.grad = None
 
         states, actions, counts, V_target = obs
 
