@@ -27,6 +27,7 @@ class MCTS(ABC):
         c_uct: float,
         gamma: float,
         device: str,
+        V_target_policy: str,
         root_state: np.array,
         root=None,
     ) -> None:
@@ -38,6 +39,7 @@ class MCTS(ABC):
         self.n_rollouts = n_rollouts
         self.c_uct = c_uct
         self.gamma = gamma
+        self.V_target_policy = V_target_policy
 
     @abstractmethod
     def selectionUCT(self):
@@ -102,6 +104,23 @@ class MCTS(ABC):
             node = action.parent_node
             node.update_visit_counts()
 
+    def return_results(self) -> Tuple[np.array, np.array, np.array, np.array]:
+        """ Process the output at the root node """
+        actions = np.array(
+            [child_action.action for child_action in self.root_node.child_actions]
+        )
+        counts = np.array(
+            [child_action.n for child_action in self.root_node.child_actions]
+        )
+        if self.V_target_policy == "greedy":
+            V_target = self.get_greedy_value_target()
+        elif self.V_target_policy == "softz":
+            V_target = self.get_softz_value_target(counts)
+        else:
+            V_target = self.get_a0c_value_target()
+
+        return self.root_node.state, actions.squeeze(), counts, V_target
+
 
 class MCTSDiscrete(MCTS):
     """ MCTS object """
@@ -114,6 +133,7 @@ class MCTSDiscrete(MCTS):
         n_rollouts: int,
         c_uct: float,
         gamma: float,
+        V_target_policy: str,
         device: str,
         root_state: np.array,
         root=None,
@@ -124,6 +144,7 @@ class MCTSDiscrete(MCTS):
             n_rollouts=n_rollouts,
             c_uct=c_uct,
             gamma=gamma,
+            V_target_policy=V_target_policy,
             device=device,
             root_state=root_state,
             root=root,
@@ -226,17 +247,6 @@ class MCTSDiscrete(MCTS):
         winner = argmax(UCT)
         return node.child_actions[winner]
 
-    def return_results(self) -> Tuple[np.array, np.array, np.array, np.array]:
-        """ Process the output at the root node """
-        actions = np.array(
-            [child_action.action for child_action in self.root_node.child_actions]
-        )
-        counts = np.array(
-            [child_action.n for child_action in self.root_node.child_actions]
-        )
-        V_target = self.get_softz_value_target(counts)
-        return self.root_node.state, actions.squeeze(), counts, V_target
-
     def forward(self, action: int, state: np.array) -> None:
         """ Move the root forward """
         if not hasattr(self.root_node.child_actions[action], "child_node"):
@@ -269,6 +279,7 @@ class MCTSContinuous(MCTS):
         c_pw: float,
         kappa: float,
         gamma: float,
+        V_target_policy: str,
         device: str,
         root_state: np.array,
         root=None,
@@ -278,6 +289,7 @@ class MCTSContinuous(MCTS):
             n_rollouts=n_rollouts,
             c_uct=c_uct,
             gamma=gamma,
+            V_target_policy=V_target_policy,
             device=device,
             root_state=root_state,
             root=root,
@@ -372,15 +384,4 @@ class MCTSContinuous(MCTS):
             )
             winner = argmax(UCT)
             return node.child_actions[winner]
-
-    def return_results(self) -> Tuple[np.array, np.array, np.array, np.array]:
-        """ Process the output at the root node """
-        actions = np.array(
-            [child_action.action for child_action in self.root_node.child_actions]
-        )
-        counts = np.array(
-            [child_action.n for child_action in self.root_node.child_actions]
-        )
-        V_target = self.get_a0c_value_target()
-        return self.root_node.state, actions.squeeze(), counts, V_target
 

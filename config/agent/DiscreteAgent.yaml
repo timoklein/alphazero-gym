@@ -32,5 +32,6 @@ mcts:
     n_rollouts: 25
     gamma: 1
     c_uct: 1.5
+    V_target_policy: softz # can be either maxQ, softz or greedy
     device: ${device}
     root_state: null

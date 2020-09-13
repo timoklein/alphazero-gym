@@ -32,5 +32,6 @@ mcts:
     kappa: 0.5
     gamma: 1
     c_uct: 0.05
+    V_target_policy: maxQ # can be either maxQ, softz or greedy
     device: ${device}
     root_state: null
