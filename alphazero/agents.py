@@ -1,3 +1,4 @@
+from alphazero.losses import A0CLoss
 import torch
 import torch.nn.functional as F
 from torch.optim import RMSprop
@@ -48,14 +49,6 @@ class Agent(ABC):
 
     @abstractmethod
     def update(self):
-        ...
-
-    @abstractmethod
-    def load_checkpoint(self):
-        ...
-
-    @abstractmethod
-    def save_checkpoint(self):
         ...
 
     @property
@@ -164,13 +157,32 @@ class DiscreteAgent(Agent):
             torch.from_numpy(V_target).unsqueeze(dim=1).float().to(self.device)
         )
 
-        action_probs_tensor = F.softmax(torch.from_numpy(counts).float(), dim=-1).to(
-            self.device
-        )
+        if isinstance(self.loss, A0CLoss):
+            actions_tensor = torch.from_numpy(actions).float().to(self.device)
+            # regularize the counts to always be greater than 0
+            # this prevents the logarithm from producing nans in the next step
+            counts += 1
+            log_counts_tensor = torch.log(torch.from_numpy(counts).float()).to(
+                self.device
+            )
 
-        # TODO: Needs to work for both losses
-        pi_logits, V_hat = self.nn(states_tensor)
-        loss_dict = self.loss(pi_logits, action_probs_tensor, V_hat, values_tensor)
+            log_probs, entropy, V_hat = self.nn.get_train_data(
+                states_tensor, actions_tensor
+            )
+            loss_dict = self.loss(
+                log_probs=log_probs,
+                log_counts=log_counts_tensor,
+                entropy=entropy,
+                V=values_tensor,
+                V_hat=V_hat,
+            )
+        else:
+            action_probs_tensor = F.softmax(
+                torch.from_numpy(counts).float(), dim=-1
+            ).to(self.device)
+            pi_logits, V_hat = self.nn(states_tensor)
+            loss_dict = self.loss(pi_logits, action_probs_tensor, V_hat, values_tensor)
+
         loss_dict["loss"].backward()
 
         if self.clip:
@@ -180,62 +192,6 @@ class DiscreteAgent(Agent):
 
         info_dict = {key: float(value) for key, value in loss_dict.items()}
         return info_dict
-
-    # TODO: Need to map location to device
-    # self.policy.load_state_dict(torch.load(actor_path, map_location=DEVICE))
-    def load_checkpoint(self, name: str) -> None:
-        model_path = (Path("models") / name).with_suffix(".tar")
-        checkpoint = torch.load(model_path)
-        self.nn = NetworkDiscrete(
-            state_dim=checkpoint["env_state_dim"],
-            action_dim=checkpoint["env_action_dim"],
-            n_hidden_layers=checkpoint["n_hidden_layers"],
-            n_hidden_units=checkpoint["n_hidden_units"],
-        )
-        self.nn.load_state_dict(checkpoint["model_state_dict"])
-
-        self.lr = checkpoint["optimizer_lr"]
-        self.optimizer = RMSprop(self.nn.parameters(), lr=self.lr, alpha=0.9, eps=1e-07)
-        self.optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-
-        self.n_traces = checkpoint["agent"]["n_traces"]
-        self.c_uct = checkpoint["agent"]["c_uct"]
-        self.gamma = checkpoint["agent"]["gamma"]
-        self.temperature = checkpoint["agent"]["temperature"]
-        # self.value_loss_ratio = checkpoint["agent"]["value_loss_ratio"]
-
-    # TODO: Load the loss correctly
-    # TODO: Fix loss saving and checkpointing
-    def save_checkpoint(self, env, name: str = None) -> None:
-        path = Path("models/")
-        if not path.exists():
-            path.mkdir()
-        if name:
-            model_path = path / f"{name}_{env.unwrapped.spec.id}.tar"
-        else:
-            date_string = datetime.now().strftime(r"%Y_%m_%d__%H_%M_%S")
-            model_path = path / f"{date_string}_{env.unwrapped.spec.id}.tar"
-        loss_info = self.loss.get_info()
-        torch.save(
-            {
-                "env": env.unwrapped.spec.id,
-                "env_state_dim": self.state_dim,
-                "env_action_dim": self.action_dim,
-                "n_hidden_layers": self.nn.n_hidden_layers,
-                "n_hidden_units": self.nn.n_hidden_units,
-                "model_state_dict": self.nn.state_dict(),
-                "optimizer_lr": self.optimizer.param_groups[0]["lr"],
-                "optimizer_state_dict": self.optimizer.state_dict(),
-                "agent": {
-                    "n_traces": self.n_traces,
-                    "c_uct": self.c_uct,
-                    "gamma": self.gamma,
-                    "temperature": self.temperature,
-                },
-                "loss": loss_info,
-            },
-            model_path,
-        )
 
 
 class ContinuousAgent(Agent):
@@ -310,72 +266,3 @@ class ContinuousAgent(Agent):
         info_dict = {key: float(value) for key, value in loss_dict.items()}
         return info_dict
 
-    # TODO: Load the loss correctly
-    # TODO: Need to map location to device
-    # self.policy.load_state_dict(torch.load(actor_path, map_location=DEVICE))
-    def load_checkpoint(self, name: str) -> None:
-        model_path = (Path("models") / name).with_suffix(".tar")
-        checkpoint = torch.load(model_path)
-        self.nn = NetworkContinuous(
-            state_dim=checkpoint["env_state_dim"],
-            action_dim=checkpoint["env_action_dim"],
-            act_limit=checkpoint["act_limit"],
-            n_hidden_layers=checkpoint["n_hidden_layers"],
-            n_hidden_units=checkpoint["n_hidden_units"],
-        )
-        self.nn.load_state_dict(checkpoint["model_state_dict"])
-
-        self.lr = checkpoint["network_optimizer_lr"]
-        self.optimizer = RMSprop(self.nn.parameters(), lr=self.lr, alpha=0.9, eps=1e-07)
-        self.optimizer.load_state_dict(checkpoint["network_optimizer_state_dict"])
-
-        self.n_traces = checkpoint["agent"]["n_traces"]
-        self.c_uct = checkpoint["agent"]["c_uct"]
-        self.c_pw = checkpoint["agent"]["c_pw"]
-        self.kappa = checkpoint["agent"]["kappa"]
-        # self.tau = checkpoint["agent"]["tau"]
-        self.alpha = checkpoint["agent"]["alpha"]
-        self.gamma = checkpoint["agent"]["gamma"]
-        # self.value_loss_ratio = checkpoint["agent"]["value_loss_ratio"]
-
-    def save_checkpoint(self, env, name: str = None) -> None:
-        path = Path("models/")
-        if not path.exists():
-            path.mkdir()
-        if name:
-            model_path = path / f"{name}_{env.unwrapped.spec.id}.tar"
-        else:
-            date_string = datetime.now().strftime(r"%Y_%m_%d__%H_%M_%S")
-            model_path = path / f"{date_string}_{env.unwrapped.spec.id}.tar"
-
-        loss_info = {"name": type(self.loss).__name__}
-        loss_info.update(
-            {
-                key: getattr(self.loss, key)
-                for key in vars(self.loss)
-                if not key.startswith("_") and not key.startswith("training")
-            }
-        )
-
-        torch.save(
-            {
-                "env": env.unwrapped.spec.id,
-                "env_state_dim": self.state_dim,
-                "env_action_dim": self.action_dim,
-                "act_limit": env.action_space.high[0],
-                "n_hidden_layers": self.nn.n_hidden_layers,
-                "n_hidden_units": self.nn.n_hidden_units,
-                "model_state_dict": self.nn.state_dict(),
-                "network_optimizer_lr": self.optimizer.param_groups[0]["lr"],
-                "network_optimizer_state_dict": self.optimizer.state_dict(),
-                "agent": {
-                    "n_traces": self.n_traces,
-                    "c_uct": self.c_uct,
-                    "c_pw": self.c_pw,
-                    "kappa": self.kappa,
-                    "alpha": self.alpha,
-                    "gamma": self.gamma,
-                },
-            },
-            model_path,
-        )

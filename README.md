@@ -9,30 +9,9 @@ as well as the following paper [A0C: Alpha Zero in Continuous Action Space](http
 Base implementation.  
 
 ## TODOS
-- [x] Verify that this works with tensorflow (in a virtualenv).
-- [x] Port models to PyTorch and test.
-- [x] Implement tensorboard visualization.
-- [x] Implement Agent abstraction.
-- [x] Create branch for current base version.
-- [x] Create proper policy methods for MCTS.
-- [x] restructure project.
-- [x] Implement model saving and loading.
-- [x] Implement more detailed logging.
-- [x] Decouple node and mcts.
-- [x] Implement Simulation policy.
-- [x] Implement MCTS progressive widening.
-- [x] Implement A0C.
-- [x] Use Pendulum to test (might need some custom wrappers).
-- [x] Factor out loss objects and use torch Categorical in Discrete Net
-- [x] Refactor discrete version to always return actions as well
-- [x] Refactor buffer into more efficient version
-- [x] Remove the argparse crap and use Hydra instead
-- [x] Add option to clip gradients.
-- [x] Add weight decay
+- [ ] Implement stochastic weight averaging.
 - [ ] Add Gaussian Mixture option to continuous policy network.
-- [ ] Properly implement diagonal multivariate Gaussian.
-- [ ] Fix model saving and loading using the config for instantiation.
-- [x] Enable GPU training.
+- [ ] Add  model saving and loading using the config for instantiation.
 
 
 ## Possible Enhancements to try

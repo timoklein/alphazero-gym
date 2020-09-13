@@ -58,20 +58,6 @@ class AlphaZeroLoss(Loss):
         loss = policy_loss + value_loss
         return {"loss": loss, "policy_loss": policy_loss, "value_loss": value_loss}
 
-    def get_info(self) -> Dict[str, Any]:
-        info = {"name": self.name}
-        info.update(
-            {
-                key: getattr(self, key)
-                for key in vars(self)
-                if not key.startswith("_") and not key.startswith("training")
-            }
-        )
-        return info
-
-    def __repr__(self) -> str:
-        return f"{self.name}: c_policy={self.policy_coeff}, c_value={self.value_coeff}, reduction={self.reduction}"
-
 
 class A0CLoss(Loss):
     def __init__(
@@ -136,20 +122,6 @@ class A0CLoss(Loss):
             "entropy_loss": entropy_loss,
             "value_loss": value_loss,
         }
-
-    def get_info(self) -> Dict[str, Any]:
-        info = {"name": self.name}
-        info.update(
-            {
-                key: getattr(self, key)
-                for key in vars(self)
-                if not key.startswith("_") and not key.startswith("training")
-            }
-        )
-        return info
-
-    def __repr__(self) -> str:
-        return f"{self.name}: c_policy={self.policy_coeff}, c_value={self.value_coeff}, reduction={self.reduction}"
 
 
 class A0CLossTuned(A0CLoss):
@@ -219,16 +191,3 @@ class A0CLossTuned(A0CLoss):
             "alpha_loss": alpha_loss,
         }
 
-    def get_info(self) -> Dict[str, Any]:
-        info = {"name": self.name}
-        info.update(
-            {
-                key: getattr(self, key)
-                for key in vars(self)
-                if not key.startswith("_") and not key.startswith("training")
-            }
-        )
-        return info
-
-    def __repr__(self) -> str:
-        return f"{self.name}: c_policy={self.policy_coeff}, c_value={self.value_coeff}, reduction={self.reduction}"

@@ -180,7 +180,6 @@ class MCTSDiscrete(MCTS):
             self.evaluation(self.root_node, V)
         else:
             self.evaluation(self.root_node)
-
         for i in range(self.n_rollouts):
             # reset to root for new trace
             node = self.root_node

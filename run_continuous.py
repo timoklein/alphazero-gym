@@ -4,7 +4,7 @@ import wandb
 import hydra
 from omegaconf.dictconfig import DictConfig
 
-from alphazero.losses import A0CLossTuned
+from alphazero.losses import A0CLossTuned, A0CLoss
 from alphazero.helpers import check_space, store_actions
 from rl.make_game import make_game
 
@@ -41,7 +41,37 @@ def run_continuous_agent(cfg: DictConfig):
     cfg.network.act_limit = float(Env.action_space.high[0])
 
     agent = hydra.utils.instantiate(cfg.agent)
-    run = wandb.init(name="A0C", project="a0c")
+
+    config = {
+        "Environment": Env.unwrapped.spec.id,
+        "Environment seed": cfg.seed,
+        "Batch size": cfg.buffer.batch_size,
+        "Replay buffer size": cfg.buffer.max_size,
+        "MCTS rollouts": cfg.mcts.n_rollouts,
+        "UCT constant": cfg.mcts.c_uct,
+        "Discount factor": cfg.mcts.gamma,
+        "Progressive widening factor [c_pw]": cfg.mcts.c_pw,
+        "Progressive widening exponent [kappa]": cfg.mcts.kappa,
+        "Network hidden layers": cfg.network.n_hidden_layers,
+        "Network hidden units": cfg.network.n_hidden_units,
+        "Learning rate": cfg.network_optimizer.lr,
+        "Log counts scaling factor [tau]": cfg.agent.loss_cfg.tau,
+        "Policy Coefficient": cfg.agent.loss_cfg.policy_coeff,
+        "Value coefficient": cfg.agent.loss_cfg.value_coeff,
+        "Loss reduction": cfg.agent.loss_cfg.reduction,
+    }
+
+    if isinstance(agent.loss, A0CLossTuned):
+        config.update({"Loss lr": 0.001, "Loss type": "A0C loss tuned"})
+    elif isinstance(agent.loss, A0CLoss):
+        config.update(
+            {
+                "Entropy coeff [alpha]": cfg.agent.loss_cfg.alpha,
+                "Loss type": "A0C loss untuned",
+            }
+        )
+
+    run = wandb.init(name="A0C", project="a0c", config=config)
 
     pbar = trange(cfg.num_train_episodes)
     for ep in pbar:

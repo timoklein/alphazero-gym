@@ -34,9 +34,9 @@ class NetworkDiscrete(nn.Module):
         x = F.elu(self.in_layer(x))
         x = self.hidden(x)
         # no need for softmax, can be computed directly from cross-entropy loss
-        pi_hat = self.policy_head(x)
+        pi_logits = self.policy_head(x)
         V_hat = self.value_head(x)
-        return pi_hat, V_hat
+        return pi_logits, V_hat
 
     def get_train_data(
         self, states: torch.Tensor, actions: torch.Tensor
@@ -44,8 +44,11 @@ class NetworkDiscrete(nn.Module):
         pi_logits, V_hat = self.forward(states)
 
         pi_hat = Categorical(F.softmax(pi_logits, dim=-1))
-        log_probs = pi_hat.log_prob(actions)
-        entropy = log_probs.sum(axis=-1)
+        log_probs = torch.cat(
+            [pi_hat.log_prob(action_b).unsqueeze(dim=1) for action_b in actions.t()],
+            dim=1,
+        )
+        entropy = -pi_hat.entropy()
 
         return log_probs, entropy, V_hat
 

@@ -1,6 +1,6 @@
 defaults:
     - agent: DiscreteAgent
-    - loss: AlphaZeroLoss
+    - loss: A0CLossTuned
 
 game: CartPole-v0
 seed: 34
