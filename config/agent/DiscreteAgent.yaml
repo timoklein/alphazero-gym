@@ -6,6 +6,7 @@ agent:
     mcts_cfg: ${mcts}
     loss_cfg: ${loss}
     optimizer_cfg: ${network_optimizer}
+    train_epochs: ${num_train_epochs}
     grad_clip: 0
     temperature: 1.0
     device: ${device}

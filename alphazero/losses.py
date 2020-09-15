@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from torch.nn.utils import clip_grad_norm
 from torch.optim import Adam
 
-from typing import Dict, Any
+from typing import Dict
 from abc import abstractmethod
 
 

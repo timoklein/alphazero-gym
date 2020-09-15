@@ -45,6 +45,9 @@ def run_continuous_agent(cfg: DictConfig):
     config = {
         "Environment": Env.unwrapped.spec.id,
         "Environment seed": cfg.seed,
+        "Training episodes": cfg.num_train_episodes,
+        "Episode length": cfg.max_episode_length,
+        "Training epochs": cfg.num_train_epochs,
         "Batch size": cfg.buffer.batch_size,
         "Replay buffer size": cfg.buffer.max_size,
         "MCTS rollouts": cfg.mcts.n_rollouts,
@@ -54,10 +57,10 @@ def run_continuous_agent(cfg: DictConfig):
         "Progressive widening exponent [kappa]": cfg.mcts.kappa,
         "Network hidden layers": cfg.network.n_hidden_layers,
         "Network hidden units": cfg.network.n_hidden_units,
-        "Number of GMM components": cfg.network.num_components,
+        "Num mixture components": cfg.network.num_components,
         "Learning rate": cfg.network_optimizer.lr,
         "Log counts scaling factor [tau]": cfg.agent.loss_cfg.tau,
-        "Policy Coefficient": cfg.agent.loss_cfg.policy_coeff,
+        "Policy coefficient": cfg.agent.loss_cfg.policy_coeff,
         "Value coefficient": cfg.agent.loss_cfg.value_coeff,
         "Loss reduction": cfg.agent.loss_cfg.reduction,
     }

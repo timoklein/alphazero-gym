@@ -1,7 +1,6 @@
 from alphazero.losses import A0CLoss
 import torch
 import torch.nn.functional as F
-from torch.optim import RMSprop
 from torch.nn.utils import clip_grad_norm
 import numpy as np
 import gym
@@ -10,14 +9,11 @@ from omegaconf.dictconfig import DictConfig
 
 
 from collections import defaultdict
-from pathlib import Path
-from datetime import datetime
 from typing import Dict, Tuple
 from abc import ABC, abstractmethod
 
 from torch.optim import optimizer
 
-from .networks import NetworkContinuous, NetworkDiscrete
 from .helpers import stable_normalizer
 from .buffers import ReplayBuffer
 
@@ -29,6 +25,7 @@ class Agent(ABC):
         loss_cfg: DictConfig,
         mcts_cfg: DictConfig,
         optimizer_cfg: DictConfig,
+        train_epochs: int,
         grad_clip: float,
         device: str,
     ) -> None:
@@ -41,6 +38,7 @@ class Agent(ABC):
             optimizer_cfg, params=self.nn.parameters()
         )
 
+        self.train_epochs = train_epochs
         self.clip = grad_clip
 
     @abstractmethod
@@ -90,7 +88,7 @@ class Agent(ABC):
     def train(self, buffer: ReplayBuffer) -> float:
         buffer.reshuffle()
         running_loss = defaultdict(float)
-        for epoch in range(1):
+        for epoch in range(self.train_epochs):
             for batches, obs in enumerate(buffer):
                 loss = self.update(obs)
                 for key in loss.keys():
@@ -108,6 +106,7 @@ class DiscreteAgent(Agent):
         mcts_cfg: DictConfig,
         loss_cfg: DictConfig,
         optimizer_cfg: DictConfig,
+        train_epochs: int,
         grad_clip: float,
         temperature: float,
         device: str,
@@ -118,6 +117,7 @@ class DiscreteAgent(Agent):
             loss_cfg=loss_cfg,
             mcts_cfg=mcts_cfg,
             optimizer_cfg=optimizer_cfg,
+            train_epochs=train_epochs,
             grad_clip=grad_clip,
             device=device,
         )
@@ -204,6 +204,7 @@ class ContinuousAgent(Agent):
         mcts_cfg: DictConfig,
         loss_cfg: DictConfig,
         optimizer_cfg: DictConfig,
+        train_epochs: int,
         grad_clip: float,
         device: str,
     ) -> None:
@@ -213,6 +214,7 @@ class ContinuousAgent(Agent):
             loss_cfg=loss_cfg,
             mcts_cfg=mcts_cfg,
             optimizer_cfg=optimizer_cfg,
+            train_epochs=train_epochs,
             grad_clip=grad_clip,
             device=device,
         )
