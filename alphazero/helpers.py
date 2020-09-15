@@ -73,4 +73,3 @@ def is_atari_game(env: gym.Env) -> bool:
     """ Verify whether game uses the Arcade Learning Environment """
     env = get_base_env(env)
     return hasattr(env, "ale")
-

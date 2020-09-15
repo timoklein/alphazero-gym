@@ -271,4 +271,3 @@ class ContinuousAgent(Agent):
 
         info_dict = {key: float(value) for key, value in loss_dict.items()}
         return info_dict
-

@@ -7,3 +7,4 @@ policy_coeff: 1
 value_coeff: 1
 reduction: mean
 grad_clip: ${agent.grad_clip}
+device: ${device}

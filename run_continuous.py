@@ -130,4 +130,3 @@ def run_continuous_agent(cfg: DictConfig):
 
 if __name__ == "__main__":
     episode_returns, actions_list = run_continuous_agent()
-

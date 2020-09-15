@@ -191,4 +191,3 @@ class NetworkContinuous(nn.Module):
         V_hat = self.value_head(x)
         self.train()
         return V_hat.detach().cpu().numpy()
-

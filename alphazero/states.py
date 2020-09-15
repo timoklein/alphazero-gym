@@ -160,4 +160,3 @@ class ActionContinuous(Action):
     ) -> NodeContinuous:
         self.child_node = NodeContinuous(state, r, terminal, self)
         return self.child_node
-

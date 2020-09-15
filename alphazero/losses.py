@@ -134,17 +134,19 @@ class A0CLossTuned(A0CLoss):
         value_coeff: float,
         reduction: str,
         grad_clip: float,
+        device: str,
     ) -> None:
         self.tau = tau
         self.policy_coeff = policy_coeff
         self.value_coeff = value_coeff
         self.reduction = reduction
         self.clip = grad_clip
+        self.device = torch.device(device)
 
         # set target entropy to -|A|
         self.target_entropy = -action_dim
         # initialize alpha to 1
-        self.log_alpha = torch.zeros(1, requires_grad=True)
+        self.log_alpha = torch.zeros(1, requires_grad=True, device=self.device)
         self.alpha = self.log_alpha.exp().item()
         # for simplicity: Use the same optimizer settings as for the neural network
         self.a_optimizer = Adam([self.log_alpha], lr=lr)
@@ -190,4 +192,3 @@ class A0CLossTuned(A0CLoss):
             "value_loss": value_loss,
             "alpha_loss": alpha_loss,
         }
-

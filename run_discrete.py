@@ -140,4 +140,3 @@ def run_discrete_agent(cfg: DictConfig):
 
 if __name__ == "__main__":
     episode_returns, best_actions = run_discrete_agent()
-

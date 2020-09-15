@@ -6,7 +6,7 @@ game: Pendulum-v0
 seed: 34
 num_train_episodes: 200
 max_episode_length: 200
-device: cpu
+device: cuda
 
 buffer:
     _target_: alphazero.buffers.ReplayBuffer

@@ -384,4 +384,3 @@ class MCTSContinuous(MCTS):
             )
             winner = argmax(UCT)
             return node.child_actions[winner]
-

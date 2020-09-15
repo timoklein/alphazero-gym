@@ -153,4 +153,3 @@ class ScaledObservationWrapper(ObservationRewardWrapper):
 
     def observation(self, observation):
         return np.array(observation).astype(np.float32) / 255.0
-
