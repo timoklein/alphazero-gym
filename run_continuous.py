@@ -119,7 +119,7 @@ def run_continuous_agent(cfg: DictConfig):
 
         info_dict["Episode reward"] = R
         if isinstance(agent.loss, A0CLossTuned):
-            info_dict["alpha"] = agent.loss.alpha
+            info_dict["alpha"] = agent.loss.alpha.detach().cpu().item()
 
         run.log(
             info_dict, step=ep,

@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from torch.nn.utils import clip_grad_norm
 from torch.optim import Adam
 
-from typing import Dict
+from typing import Dict, Union
 from abc import abstractmethod
 
 
@@ -64,7 +64,7 @@ class A0CLoss(Loss):
         self,
         tau: float,
         policy_coeff: float,
-        alpha: float,
+        alpha: Union[float, torch.Tensor],
         value_coeff: float,
         reduction: str,
     ) -> None:
@@ -98,9 +98,9 @@ class A0CLoss(Loss):
 
     def _calculate_entropy_loss(self, entropy: torch.Tensor) -> torch.Tensor:
         if self.reduction == "mean":
-            return -entropy.mean()
+            return entropy.mean()
         else:
-            return -entropy.sum()
+            return entropy.sum()
 
     def forward(
         self,
@@ -147,27 +147,32 @@ class A0CLossTuned(A0CLoss):
         self.target_entropy = -action_dim
         # initialize alpha to 1
         self.log_alpha = torch.zeros(1, requires_grad=True, device=self.device)
-        self.alpha = self.log_alpha.exp().item()
         # for simplicity: Use the same optimizer settings as for the neural network
-        self.a_optimizer = Adam([self.log_alpha], lr=lr)
+
+        self.alpha = self.log_alpha.exp()
+
+        self.optimizer = Adam([self.log_alpha], lr=lr)
+
         super().__init__(
-            self.tau, self.policy_coeff, self.alpha, self.value_coeff, self.reduction
+            tau=tau,
+            policy_coeff=policy_coeff,
+            alpha=self.alpha,
+            value_coeff=value_coeff,
+            reduction=reduction,
         )
 
     def _update_alpha(self, entropy: torch.Tensor) -> torch.Tensor:
-        # we don't want to backprop through the network here
-        a_entropy = entropy.detach()
+        self.log_alpha.grad = None
         # calculate loss for entropy regularization parameter
-        alpha_loss = (-self.log_alpha * (a_entropy + self.target_entropy)).mean()
-        # optimize and set values
-        self.a_optimizer.zero_grad()
+        alpha_loss = (self.alpha * (entropy - self.target_entropy).detach()).mean()
         alpha_loss.backward()
 
         if self.clip:
             clip_grad_norm(self.log_alpha, self.clip)
+        self.optimizer.step()
 
-        self.a_optimizer.step()
-        self.alpha = self.log_alpha.exp().item()
+        self.alpha = self.log_alpha.exp()
+
         return alpha_loss.detach().cpu()
 
     def forward(
@@ -182,7 +187,7 @@ class A0CLossTuned(A0CLoss):
             log_probs, log_counts
         )
         value_loss = self.value_coeff * self._calculate_value_loss(V_hat, V)
-        entropy_loss = self.alpha * self._calculate_entropy_loss(entropy)
+        entropy_loss = self.alpha.detach() * self._calculate_entropy_loss(entropy)
         loss = policy_loss + entropy_loss + value_loss
         alpha_loss = self._update_alpha(entropy)
         return {

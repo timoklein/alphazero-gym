@@ -11,5 +11,5 @@ device: cpu
 
 buffer:
     _target_: alphazero.buffers.ReplayBuffer
-    max_size: 1000
+    max_size: 3000
     batch_size: 32

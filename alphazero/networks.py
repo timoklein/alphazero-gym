@@ -49,7 +49,7 @@ class NetworkDiscrete(nn.Module):
             F.softmax(pi_logits, dim=-1).unsqueeze(dim=0).repeat((num_actions, 1, 1))
         )
         log_probs = pi_hat.log_prob(actions.t()).t()
-        entropy = -pi_hat.entropy().mean(dim=0)
+        entropy = pi_hat.entropy().mean(dim=0)
 
         return log_probs, entropy, V_hat
 
@@ -153,9 +153,11 @@ class NetworkContinuous(nn.Module):
         # correct for action bound squashing without summing
         logp_policy = log_probs - (2 * (np.log(2) - actions - F.softplus(-2 * actions)))
 
+        # estimate the entropy for each distribution in the batch
+        # the entropy can be estimated using the log_probs as MC samples
         entropy = log_probs.sum(axis=-1)
         entropy -= (2 * (np.log(2) - actions - F.softplus(-2 * actions))).sum(axis=1)
-        return logp_policy, entropy, V_hat
+        return logp_policy, -entropy, V_hat
 
     @torch.no_grad()
     def sample_action(self, x: torch.Tensor) -> np.array:
