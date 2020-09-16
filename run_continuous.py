@@ -4,7 +4,7 @@ import wandb
 import hydra
 from omegaconf.dictconfig import DictConfig
 
-from alphazero.losses import A0CLossTuned, A0CLoss
+from alphazero.losses import A0CLossTuned, A0CLoss, A0CQLoss, A0CQLossTuned
 from alphazero.helpers import check_space, store_actions
 from rl.make_game import make_game
 
@@ -15,7 +15,6 @@ def run_continuous_agent(cfg: DictConfig):
     R_max = -np.inf
     best_actions = None
     actions_list = []
-
     # Environments
     Env = make_game(cfg.game)
 
@@ -24,6 +23,7 @@ def run_continuous_agent(cfg: DictConfig):
     Env.seed(cfg.seed)
 
     buffer = hydra.utils.instantiate(cfg.buffer)
+
     t_total = 0  # total steps
 
     # get environment info
@@ -74,6 +74,18 @@ def run_continuous_agent(cfg: DictConfig):
                 "Loss type": "A0C loss untuned",
             }
         )
+    elif isinstance(agent.loss, A0CQLossTuned):
+        config.update(
+            {"Count temperature": 1, "Loss lr": 0.001, "Loss type": "A0C Q loss tuned"}
+        )
+    elif isinstance(agent.loss, A0CQLoss):
+        config.update(
+            {
+                "Count temperature": cfg.agent.loss_cfg.temperature,
+                "Entropy coeff [alpha]": cfg.agent.loss_cfg.alpha,
+                "Loss type": "A0C Q loss untuned",
+            }
+        )
 
     run = wandb.init(name="A0C", project="a0c", config=config)
 
@@ -118,7 +130,9 @@ def run_continuous_agent(cfg: DictConfig):
         # agent.save_checkpoint(env=Env)
 
         info_dict["Episode reward"] = R
-        if isinstance(agent.loss, A0CLossTuned):
+        if isinstance(agent.loss, A0CLossTuned) or isinstance(
+            agent.loss, A0CQLossTuned
+        ):
             info_dict["alpha"] = agent.loss.alpha.detach().cpu().item()
 
         run.log(
@@ -128,8 +142,8 @@ def run_continuous_agent(cfg: DictConfig):
         reward = np.round(R, 2)
         pbar.set_description(f"{ep=}, {reward=}, {t_total=}")
     # Return results
-    return episode_returns, best_actions
+    return episode_returns  # , best_actions
 
 
 if __name__ == "__main__":
-    episode_returns, actions_list = run_continuous_agent()
+    run_continuous_agent()

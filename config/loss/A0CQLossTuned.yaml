@@ -1,0 +1,11 @@
+# @package _group_
+_target_: alphazero.losses.A0CQLossTuned
+action_dim: ${network.action_dim}
+lr: 0.001
+tau: 1
+temperature: 1
+policy_coeff: 1
+value_coeff: 1
+reduction: mean
+grad_clip: ${agent.grad_clip}
+device: ${device}

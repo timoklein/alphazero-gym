@@ -165,16 +165,14 @@ class DiscreteAgent(Agent):
             # regularize the counts to always be greater than 0
             # this prevents the logarithm from producing nans in the next step
             counts += 1
-            log_counts_tensor = torch.log(torch.from_numpy(counts).float()).to(
-                self.device
-            )
+            counts_tensor = torch.from_numpy(counts).float().to(self.device)
 
             log_probs, entropy, V_hat = self.nn.get_train_data(
                 states_tensor, actions_tensor
             )
             loss_dict = self.loss(
                 log_probs=log_probs,
-                log_counts=log_counts_tensor,
+                counts=counts_tensor,
                 entropy=entropy,
                 V=values_tensor,
                 V_hat=V_hat,
@@ -251,7 +249,7 @@ class ContinuousAgent(Agent):
             torch.from_numpy(V_target).unsqueeze(dim=1).float().to(self.device)
         )
 
-        log_counts_tensor = torch.log(torch.from_numpy(counts).float()).to(self.device)
+        counts_tensor = torch.from_numpy(counts).float().to(self.device)
 
         log_probs, entropy, V_hat = self.nn.get_train_data(
             states_tensor, actions_tensor
@@ -259,7 +257,7 @@ class ContinuousAgent(Agent):
 
         loss_dict = self.loss(
             log_probs=log_probs,
-            log_counts=log_counts_tensor,
+            counts=counts_tensor,
             entropy=entropy,
             V=values_tensor,
             V_hat=V_hat,
