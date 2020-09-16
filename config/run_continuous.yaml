@@ -1,6 +1,7 @@
 defaults:
-    - agent: ContinuousAgent
-    - loss: A0CLossTuned
+  - agent: ContinuousAgent
+  - loss: A0CLossTuned
+    
 
 game: Pendulum-v0
 seed: 34
@@ -10,6 +11,6 @@ num_train_epochs: 1
 device: cpu
 
 buffer:
-    _target_: alphazero.buffers.ReplayBuffer
-    max_size: 3000
-    batch_size: 32
+  _target_: alphazero.buffers.ReplayBuffer
+  max_size: 3000
+  batch_size: 32

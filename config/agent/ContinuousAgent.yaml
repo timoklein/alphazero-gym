@@ -1,39 +1,39 @@
 # @package _global_
 agent:
-    _target_: alphazero.agents.ContinuousAgent
-    network_cfg: ${network}
-    mcts_cfg: ${mcts}
-    loss_cfg: ${loss}
-    optimizer_cfg: ${network_optimizer}
-    train_epochs: ${num_train_epochs}
-    grad_clip: 0
-    device: ${device}
+  _target_: alphazero.agents.ContinuousAgent
+  network_cfg: ${network}
+  mcts_cfg: ${mcts}
+  loss_cfg: ${loss}
+  optimizer_cfg: ${network_optimizer}
+  train_epochs: ${num_train_epochs}
+  grad_clip: 0
+  device: ${device}
     
 
 network:
-    _target_: alphazero.networks.NetworkContinuous
-    state_dim: ??? # set later
-    action_dim: ??? # set later
-    act_limit: ??? # set later
-    num_components: 1
-    n_hidden_layers: 2
-    n_hidden_units: 128
+  _target_: alphazero.networks.NetworkContinuous
+  state_dim: ??? # set later
+  action_dim: ??? # set later
+  act_limit: ??? # set later
+  num_components: 1
+  n_hidden_layers: 2
+  n_hidden_units: 128
 
 network_optimizer:
-    _target_: torch.optim.RMSprop
-    lr: 0.001
-    momentum: 0
-    weight_decay: 0
-    alpha: 0.9
-    eps: 1e-07
+  _target_: torch.optim.RMSprop
+  lr: 0.001
+  momentum: 0
+  weight_decay: 0
+  alpha: 0.9
+  eps: 1e-07
 
 mcts:
-    _target_: alphazero.mcts.MCTSContinuous
-    n_rollouts: 25
-    c_pw: 1
-    kappa: 0.5
-    gamma: 1
-    c_uct: 0.05
-    V_target_policy: maxQ # can be either maxQ, softz or greedy
-    device: ${device}
-    root_state: null
+  _target_: alphazero.mcts.MCTSContinuous
+  n_rollouts: 25
+  c_pw: 1
+  kappa: 0.5
+  gamma: 1
+  c_uct: 0.05
+  V_target_policy: maxQ # can be either maxQ, softz or greedy
+  device: ${device}
+  root_state: null

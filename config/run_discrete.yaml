@@ -1,6 +1,6 @@
 defaults:
-    - agent: DiscreteAgent
-    - loss: A0CLossTuned
+  - agent: DiscreteAgent
+  - loss: A0CLossTuned
 
 game: CartPole-v0
 seed: 34
@@ -10,6 +10,6 @@ num_train_epochs: 1
 device: cpu
 
 buffer:
-    _target_: alphazero.buffers.ReplayBuffer
-    max_size: 1000
-    batch_size: 32
+  _target_: alphazero.buffers.ReplayBuffer
+  max_size: 1000
+  batch_size: 32

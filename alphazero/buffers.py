@@ -47,7 +47,7 @@ class ReplayBuffer:
     def __len__(self) -> int:
         return len(self.experience)
 
-    def __next__(self) -> Tuple[np.array, ...]:
+    def __next__(self) -> Tuple[np.array, np.array, np.array, np.array]:
         if (self.sample_index + self.batch_size > self.size) and (
             not self.sample_index == 0
         ):
