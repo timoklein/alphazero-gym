@@ -1,6 +1,7 @@
 # @package _group_
 _target_: alphazero.losses.A0CQLossTuned
 action_dim: ${network.action_dim}
+alpha_init: 1
 lr: 0.001
 tau: 1
 temperature: 1

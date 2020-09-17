@@ -1,4 +1,6 @@
+import numpy as np
 import torch
+from torch._C import dtype
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.utils import clip_grad_norm
@@ -123,6 +125,7 @@ class A0CLossTuned(A0CLoss):
     def __init__(
         self,
         action_dim: int,
+        alpha_init: float,
         lr: float,
         tau: float,
         policy_coeff: float,
@@ -141,7 +144,12 @@ class A0CLossTuned(A0CLoss):
         # set target entropy to -|A|
         self.target_entropy = -action_dim
         # initialize alpha to 1
-        self.log_alpha = torch.zeros(1, requires_grad=True, device=self.device)
+        self.log_alpha = torch.tensor(
+            np.log(alpha_init),
+            requires_grad=True,
+            device=self.device,
+            dtype=torch.float32,
+        )
         # for simplicity: Use the same optimizer settings as for the neural network
 
         self.alpha = self.log_alpha.exp()
@@ -266,6 +274,7 @@ class A0CQLossTuned(A0CQLoss):
     def __init__(
         self,
         action_dim: int,
+        alpha_init: float,
         lr: float,
         tau: float,
         temperature: float,
@@ -285,7 +294,12 @@ class A0CQLossTuned(A0CQLoss):
         # set target entropy to -|A|
         self.target_entropy = -action_dim
         # initialize alpha to 1
-        self.log_alpha = torch.zeros(1, requires_grad=True, device=self.device)
+        self.log_alpha = torch.tensor(
+            np.log(alpha_init),
+            requires_grad=True,
+            device=self.device,
+            dtype=torch.float32,
+        )
         # for simplicity: Use the same optimizer settings as for the neural network
 
         self.alpha = self.log_alpha.exp()
