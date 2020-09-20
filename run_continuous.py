@@ -55,6 +55,8 @@ def run_continuous_agent(cfg: DictConfig):
         "Discount factor": cfg.mcts.gamma,
         "Progressive widening factor [c_pw]": cfg.mcts.c_pw,
         "Progressive widening exponent [kappa]": cfg.mcts.kappa,
+        "V target policy": cfg.mcts.V_target_policy,
+        "Final selection policy": cfg.agent.final_selection,
         "Network hidden layers": cfg.network.n_hidden_layers,
         "Network hidden units": cfg.network.n_hidden_units,
         "Num mixture components": cfg.network.num_components,

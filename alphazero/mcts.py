@@ -49,20 +49,29 @@ class MCTS(ABC):
     def search(self):
         ...
 
-    def get_softz_value_target(self, counts: np.array) -> np.array:
-        Q = np.array([child_action.Q for child_action in self.root_node.child_actions])
+    @staticmethod
+    def get_on_policy_value_target(Q: np.array, counts: np.array) -> np.array:
         return np.sum((counts / np.sum(counts)) * Q)
 
-    def get_a0c_value_target(self) -> np.array:
-        Q = np.array([child_action.Q for child_action in self.root_node.child_actions])
+    @staticmethod
+    def get_off_policy_value_target(Q) -> np.array:
         return Q.max()
 
-    def get_greedy_value_target(self) -> np.array:
+    def get_greedy_value_target(self, final_selection: str) -> np.array:
         node = self.root_node
 
         while node.terminal and node.has_children:
-            counts = np.array([child_action.n for child_action in node.child_actions])
-            child = node.child_actions[argmax(counts)].child_node
+            if final_selection == "max_value":
+                Q = np.array(
+                    [child_action.Q for child_action in self.root_node.child_actions]
+                )
+                child = node.child_actions[Q.argmax()].child_node
+            else:
+                counts = np.array(
+                    [child_action.n for child_action in node.child_actions]
+                )
+                child = node.child_actions[counts.argmax()].child_node
+
             if not child:
                 break
             else:
@@ -104,7 +113,9 @@ class MCTS(ABC):
             node = action.parent_node
             node.update_visit_counts()
 
-    def return_results(self) -> Tuple[np.array, np.array, np.array, np.array]:
+    def return_results(
+        self, final_selection: str
+    ) -> Tuple[np.array, np.array, np.array, np.array]:
         """ Process the output at the root node """
         actions = np.array(
             [child_action.action for child_action in self.root_node.child_actions]
@@ -112,14 +123,17 @@ class MCTS(ABC):
         counts = np.array(
             [child_action.n for child_action in self.root_node.child_actions]
         )
-        if self.V_target_policy == "greedy":
-            V_target = self.get_greedy_value_target()
-        elif self.V_target_policy == "softz":
-            V_target = self.get_softz_value_target(counts)
-        else:
-            V_target = self.get_a0c_value_target()
 
-        return self.root_node.state, actions.squeeze(), counts, V_target
+        Q = np.array([child_action.Q for child_action in self.root_node.child_actions])
+
+        if self.V_target_policy == "greedy":
+            V_target = self.get_greedy_value_target(final_selection)
+        elif self.V_target_policy == "on_policy":
+            V_target = self.get_on_policy_value_target(Q, counts)
+        else:
+            V_target = self.get_off_policy_value_target(Q)
+
+        return self.root_node.state, actions.squeeze(), counts, Q, V_target
 
 
 class MCTSDiscrete(MCTS):

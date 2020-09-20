@@ -4,7 +4,7 @@ import wandb
 import hydra
 from omegaconf.dictconfig import DictConfig
 
-from alphazero.losses import A0CLossTuned, A0CLoss
+from alphazero.losses import A0CLossTuned, A0CLoss, A0CQLoss, A0CQLossTuned
 from alphazero.helpers import store_actions
 from alphazero.helpers import check_space, is_atari_game
 from rl.make_game import make_game
@@ -57,6 +57,8 @@ def run_discrete_agent(cfg: DictConfig):
         "MCTS rollouts": cfg.mcts.n_rollouts,
         "UCT constant": cfg.mcts.c_uct,
         "Discount factor": cfg.mcts.gamma,
+        "V target policy": cfg.mcts.V_target_policy,
+        "Final selection policy": cfg.agent.final_selection,
         "Network hidden layers": cfg.network.n_hidden_layers,
         "Network hidden units": cfg.network.n_hidden_units,
         "Learning rate": cfg.network_optimizer.lr,
@@ -66,19 +68,24 @@ def run_discrete_agent(cfg: DictConfig):
     }
 
     if isinstance(agent.loss, A0CLossTuned):
-        config.update(
-            {
-                "Log counts scaling factor [tau]": cfg.agent.loss_cfg.tau,
-                "Loss lr": 0.001,
-                "Loss type": "A0C loss tuned",
-            }
-        )
+        config.update({"Loss lr": 0.001, "Loss type": "A0C loss tuned"})
     elif isinstance(agent.loss, A0CLoss):
         config.update(
             {
-                "Log counts scaling factor [tau]": cfg.agent.loss_cfg.tau,
                 "Entropy coeff [alpha]": cfg.agent.loss_cfg.alpha,
                 "Loss type": "A0C loss untuned",
+            }
+        )
+    elif isinstance(agent.loss, A0CQLossTuned):
+        config.update(
+            {"Count temperature": 1, "Loss lr": 0.001, "Loss type": "A0C Q loss tuned"}
+        )
+    elif isinstance(agent.loss, A0CQLoss):
+        config.update(
+            {
+                "Count temperature": cfg.agent.loss_cfg.temperature,
+                "Entropy coeff [alpha]": cfg.agent.loss_cfg.alpha,
+                "Loss type": "A0C Q loss untuned",
             }
         )
     else:
@@ -126,8 +133,11 @@ def run_discrete_agent(cfg: DictConfig):
         # Train
         info_dict = agent.train(buffer)
         info_dict["Episode reward"] = R
-        if isinstance(agent.loss, A0CLossTuned):
-            info_dict["alpha"] = agent.loss.alpha
+        info_dict["Episode reward"] = R
+        if isinstance(agent.loss, A0CLossTuned) or isinstance(
+            agent.loss, A0CQLossTuned
+        ):
+            info_dict["alpha"] = agent.loss.alpha.detach().cpu().item()
 
         # agent.save_checkpoint(env=Env)
 

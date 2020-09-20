@@ -16,7 +16,11 @@ class Loss(nn.Module):
         ...
 
     @abstractmethod
-    def get_info(self):
+    def _calculate_policy_loss(self):
+        ...
+
+    @abstractmethod
+    def _calculate_value_loss(self):
         ...
 
 

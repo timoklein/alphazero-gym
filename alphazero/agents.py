@@ -25,6 +25,7 @@ class Agent(ABC):
         loss_cfg: DictConfig,
         mcts_cfg: DictConfig,
         optimizer_cfg: DictConfig,
+        final_selection: str,
         train_epochs: int,
         grad_clip: float,
         device: str,
@@ -38,6 +39,7 @@ class Agent(ABC):
             optimizer_cfg, params=self.nn.parameters()
         )
 
+        self.final_selection = final_selection
         self.train_epochs = train_epochs
         self.clip = grad_clip
 
@@ -106,6 +108,7 @@ class DiscreteAgent(Agent):
         mcts_cfg: DictConfig,
         loss_cfg: DictConfig,
         optimizer_cfg: DictConfig,
+        final_selection: str,
         train_epochs: int,
         grad_clip: float,
         temperature: float,
@@ -117,6 +120,7 @@ class DiscreteAgent(Agent):
             loss_cfg=loss_cfg,
             mcts_cfg=mcts_cfg,
             optimizer_cfg=optimizer_cfg,
+            final_selection=final_selection,
             train_epochs=train_epochs,
             grad_clip=grad_clip,
             device=device,
@@ -135,13 +139,16 @@ class DiscreteAgent(Agent):
     ) -> Tuple[int, np.array, np.array, np.array]:
 
         self.mcts.search(Env=Env, mcts_env=mcts_env, simulation=simulation)
-        state, actions, counts, V = self.mcts.return_results()
+        state, actions, counts, Q, V = self.mcts.return_results(self.final_selection)
 
-        # Get MCTS policy
-        pi = stable_normalizer(counts, self.temperature)
-
-        # sample an action from the policy or pick best action if deterministic
-        action = pi.argmax() if deterministic else np.random.choice(len(pi), p=pi)
+        if self.final_selection == "max_value":
+            # select final action based on max Q value
+            pi = stable_normalizer(Q, self.temperature)
+            action = pi.argmax() if deterministic else np.random.choice(len(pi), p=pi)
+        else:
+            # select the final action based on visit counts
+            pi = stable_normalizer(counts, self.temperature)
+            action = pi.argmax() if deterministic else np.random.choice(len(pi), p=pi)
 
         return action, state, actions, counts, V
 
@@ -202,6 +209,7 @@ class ContinuousAgent(Agent):
         mcts_cfg: DictConfig,
         loss_cfg: DictConfig,
         optimizer_cfg: DictConfig,
+        final_selection: str,
         train_epochs: int,
         grad_clip: float,
         device: str,
@@ -212,6 +220,7 @@ class ContinuousAgent(Agent):
             loss_cfg=loss_cfg,
             mcts_cfg=mcts_cfg,
             optimizer_cfg=optimizer_cfg,
+            final_selection=final_selection,
             train_epochs=train_epochs,
             grad_clip=grad_clip,
             device=device,
@@ -226,10 +235,16 @@ class ContinuousAgent(Agent):
     ) -> Tuple[int, np.array, np.array, np.array]:
 
         self.mcts.search(Env=Env, mcts_env=mcts_env, simulation=simulation)
-        state, actions, counts, V_hat = self.mcts.return_results()
+        state, actions, counts, Q, V_hat = self.mcts.return_results(
+            self.final_selection
+        )
 
-        # select the action that was visited most
-        action = actions[counts.argmax()][np.newaxis]
+        if self.final_selection == "max_value":
+            # select the action with the best action value
+            action = actions[Q.argmax()][np.newaxis]
+        else:
+            # select the action that was visited most
+            action = actions[counts.argmax()][np.newaxis]
 
         return action, state, actions, counts, V_hat
 

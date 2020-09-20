@@ -7,6 +7,7 @@ agent:
   loss_cfg: ${loss}
   optimizer_cfg: ${network_optimizer}
   train_epochs: ${num_train_epochs}
+  final_selection: max_visits # can be max_visits or max_counts
   grad_clip: 0
   temperature: 1.0
   device: ${device}
@@ -33,6 +34,6 @@ mcts:
   n_rollouts: 25
   gamma: 1
   c_uct: 1.5
-  V_target_policy: softz # can be either maxQ, softz or greedy
+  V_target_policy: on_policy # can be either on_policy, off_policy or greedy
   device: ${device}
   root_state: null

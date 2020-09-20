@@ -6,6 +6,7 @@ agent:
   loss_cfg: ${loss}
   optimizer_cfg: ${network_optimizer}
   train_epochs: ${num_train_epochs}
+  final_selection: max_visit # can be max_visit or max_value
   grad_clip: 0
   device: ${device}
     
@@ -15,7 +16,7 @@ network:
   state_dim: ??? # set later
   action_dim: ??? # set later
   act_limit: ??? # set later
-  num_components: 1
+  num_components: 2
   n_hidden_layers: 2
   n_hidden_units: 128
 
@@ -34,6 +35,6 @@ mcts:
   kappa: 0.5
   gamma: 1
   c_uct: 0.05
-  V_target_policy: maxQ # can be either maxQ, softz or greedy
+  V_target_policy: off_policy # can be either on_policy, off_policy or greedy
   device: ${device}
   root_state: null
