@@ -1,12 +1,12 @@
 defaults:
   - agent: ContinuousAgent
-  - loss: A0CQLoss
+  - loss: A0CQLossTuned
   - hydra/sweeper: ax
     
 
 game: Pendulum-v0
 seed: 34
-num_train_episodes: 200
+num_train_episodes: 100
 max_episode_length: 200
 num_train_epochs: 1
 device: cpu

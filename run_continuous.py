@@ -77,13 +77,10 @@ def run_continuous_agent(cfg: DictConfig):
             }
         )
     elif isinstance(agent.loss, A0CQLossTuned):
-        config.update(
-            {"Count temperature": 1, "Loss lr": 0.001, "Loss type": "A0C Q loss tuned"}
-        )
+        config.update({"Loss lr": 0.001, "Loss type": "A0C Q loss tuned"})
     elif isinstance(agent.loss, A0CQLoss):
         config.update(
             {
-                "Count temperature": cfg.agent.loss_cfg.temperature,
                 "Entropy coeff [alpha]": cfg.agent.loss_cfg.alpha,
                 "Loss type": "A0C Q loss untuned",
             }

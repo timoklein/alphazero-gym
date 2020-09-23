@@ -9,7 +9,8 @@ as well as the following paper [A0C: Alpha Zero in Continuous Action Space](http
 Base implementation.  
 
 ## TDOS
-- [ ] Add  model saving and loading using the config for instantiation.
+- [ ] Add  model saving and loading using the config for instantiation.  
+- [ ] Needs to save episode rewards and other metrics into stored numpy arrays for later plotting.
 
 
 ## Possible Enhancements to try

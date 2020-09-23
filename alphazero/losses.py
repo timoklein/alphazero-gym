@@ -208,7 +208,6 @@ class A0CQLoss(Loss):
     def __init__(
         self,
         tau: float,
-        temperature: float,
         policy_coeff: float,
         alpha: Union[float, torch.Tensor],
         value_coeff: float,
@@ -216,7 +215,6 @@ class A0CQLoss(Loss):
     ) -> None:
         super().__init__()
         self.tau = tau
-        self.temperature = temperature
         self.policy_coeff = policy_coeff
         self.alpha = alpha
         self.value_coeff = value_coeff
@@ -229,9 +227,7 @@ class A0CQLoss(Loss):
         # tf.stop_gradient(self.log_pi_a_s - tf.squeeze((n_a * temp) - self.V_hat, axis=1)) * self.log_pi_a_s
         with torch.no_grad():
             # calculate scaling term
-            log_diff = (
-                log_probs - self.tau * (self.temperature * counts - V_hat).squeeze()
-            )
+            log_diff = log_probs - (self.tau * counts - V_hat).squeeze()
 
         # multiple with log_probs gradient
         policy_loss = torch.einsum("ni, ni -> n", log_diff, log_probs)
@@ -281,7 +277,6 @@ class A0CQLossTuned(A0CQLoss):
         alpha_init: float,
         lr: float,
         tau: float,
-        temperature: float,
         policy_coeff: float,
         value_coeff: float,
         reduction: str,
@@ -312,7 +307,6 @@ class A0CQLossTuned(A0CQLoss):
 
         super().__init__(
             tau=tau,
-            temperature=temperature,
             policy_coeff=policy_coeff,
             alpha=self.alpha,
             value_coeff=value_coeff,

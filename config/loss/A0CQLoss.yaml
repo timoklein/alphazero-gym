@@ -1,7 +1,6 @@
 # @package _group_
 _target_: alphazero.losses.A0CQLoss
 tau: 1
-temperature: 1
 policy_coeff: 1
 alpha: 0
 value_coeff: 1

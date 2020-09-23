@@ -4,7 +4,6 @@ action_dim: ${network.action_dim}
 alpha_init: 1
 lr: 0.001
 tau: 1
-temperature: 1
 policy_coeff: 1
 value_coeff: 1
 reduction: mean

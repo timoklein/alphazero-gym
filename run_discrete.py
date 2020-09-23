@@ -68,22 +68,33 @@ def run_discrete_agent(cfg: DictConfig):
     }
 
     if isinstance(agent.loss, A0CLossTuned):
-        config.update({"Loss lr": 0.001, "Loss type": "A0C loss tuned"})
+        config.update(
+            {
+                "Temperature tau": cfg.agent.loss_cfg.tau,
+                "Loss lr": 0.001,
+                "Loss type": "A0C loss tuned",
+            }
+        )
     elif isinstance(agent.loss, A0CLoss):
         config.update(
             {
+                "Temperature tau": cfg.agent.loss_cfg.tau,
                 "Entropy coeff [alpha]": cfg.agent.loss_cfg.alpha,
                 "Loss type": "A0C loss untuned",
             }
         )
     elif isinstance(agent.loss, A0CQLossTuned):
         config.update(
-            {"Count temperature": 1, "Loss lr": 0.001, "Loss type": "A0C Q loss tuned"}
+            {
+                "Temperature tau": cfg.agent.loss_cfg.tau,
+                "Loss lr": 0.001,
+                "Loss type": "A0C Q loss tuned",
+            }
         )
     elif isinstance(agent.loss, A0CQLoss):
         config.update(
             {
-                "Count temperature": cfg.agent.loss_cfg.temperature,
+                "Temperature tau": cfg.agent.loss_cfg.tau,
                 "Entropy coeff [alpha]": cfg.agent.loss_cfg.alpha,
                 "Loss type": "A0C Q loss untuned",
             }
