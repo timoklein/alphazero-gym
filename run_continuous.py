@@ -68,7 +68,13 @@ def run_continuous_agent(cfg: DictConfig):
     }
 
     if isinstance(agent.loss, A0CLossTuned):
-        config.update({"Loss lr": 0.001, "Loss type": "A0C loss tuned"})
+        config.update(
+            {
+                "Target entropy": -cfg.agent.loss_cfg.action_dim,
+                "Loss lr": 0.001,
+                "Loss type": "A0C loss tuned",
+            }
+        )
     elif isinstance(agent.loss, A0CLoss):
         config.update(
             {
@@ -77,7 +83,13 @@ def run_continuous_agent(cfg: DictConfig):
             }
         )
     elif isinstance(agent.loss, A0CQLossTuned):
-        config.update({"Loss lr": 0.001, "Loss type": "A0C Q loss tuned"})
+        config.update(
+            {
+                "Target entropy": -cfg.agent.loss_cfg.action_dim,
+                "Loss lr": 0.001,
+                "Loss type": "A0C Q loss tuned",
+            }
+        )
     elif isinstance(agent.loss, A0CQLoss):
         config.update(
             {

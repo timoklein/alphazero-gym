@@ -1,6 +1,6 @@
 defaults:
   - agent: ContinuousAgent
-  - loss: A0CQLossTuned
+  - loss: A0CLoss
   - hydra/sweeper: ax
     
 

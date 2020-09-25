@@ -10,6 +10,7 @@ Base implementation.
 
 ## TDOS
 - [ ] Add  model saving and loading using the config for instantiation.  
+- [ ] Add mixed precision training.  
 - [ ] Needs to save episode rewards and other metrics into stored numpy arrays for later plotting.
 
 
