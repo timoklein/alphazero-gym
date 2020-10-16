@@ -1,11 +1,14 @@
 defaults:
   - agent: DiscreteAgent
+  - mcts: MCTSDiscrete
+  - optimizer: RMSProp
+  - network: NetworkDiscrete
   - loss: A0CLossTuned
   - hydra/sweeper: ax
 
 game: CartPole-v0
 seed: 34
-num_train_episodes: 200
+num_train_episodes: 100
 max_episode_length: 200
 num_train_epochs: 1
 device: cpu

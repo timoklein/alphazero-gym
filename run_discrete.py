@@ -61,7 +61,7 @@ def run_discrete_agent(cfg: DictConfig):
         "Final selection policy": cfg.agent.final_selection,
         "Network hidden layers": cfg.network.n_hidden_layers,
         "Network hidden units": cfg.network.n_hidden_units,
-        "Learning rate": cfg.network_optimizer.lr,
+        "Learning rate": cfg.optimizer.lr,
         "Policy coefficient": cfg.agent.loss_cfg.policy_coeff,
         "Value coefficient": cfg.agent.loss_cfg.value_coeff,
         "Loss reduction": cfg.agent.loss_cfg.reduction,

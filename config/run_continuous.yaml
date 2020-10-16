@@ -1,5 +1,8 @@
 defaults:
   - agent: ContinuousAgent
+  - mcts: MCTSContinuous
+  - optimizer: RMSProp
+  - network: NetworkContinuous
   - loss: A0CLoss
   - hydra/sweeper: ax
     

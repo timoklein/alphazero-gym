@@ -1,0 +1,8 @@
+# @package _group_
+_target_: alphazero.networks.NetworkContinuous
+state_dim: ??? # set later
+action_dim: ??? # set later
+act_limit: ??? # set later
+num_components: 1
+n_hidden_layers: 2
+n_hidden_units: 128

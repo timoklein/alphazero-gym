@@ -60,7 +60,7 @@ def run_continuous_agent(cfg: DictConfig):
         "Network hidden layers": cfg.network.n_hidden_layers,
         "Network hidden units": cfg.network.n_hidden_units,
         "Num mixture components": cfg.network.num_components,
-        "Learning rate": cfg.network_optimizer.lr,
+        "Learning rate": cfg.optimizer.lr,
         "Log counts scaling factor [tau]": cfg.agent.loss_cfg.tau,
         "Policy coefficient": cfg.agent.loss_cfg.policy_coeff,
         "Value coefficient": cfg.agent.loss_cfg.value_coeff,

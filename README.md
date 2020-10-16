@@ -11,12 +11,16 @@ Base implementation.
 ## TDOS
 - [ ] Add  model saving and loading using the config for instantiation.  
 - [ ] Add mixed precision training.  
-- [ ] Needs to save episode rewards and other metrics into stored numpy arrays for later plotting.
+- [ ] Add pandas exporter for wandb/hydra data.  
 
 
 ## Possible Enhancements to try
-- [ ] Implement stochastic weight averaging.
-- [ ] Test a prioritized replay buffer.
-- [ ] Warm starting.
-- [ ] RAD style data augmentations.
-- [ ] Playout cap randomization.
+- [ ] Implement stochastic weight averaging.  
+- [ ] Test a prioritized replay buffer.  
+- [ ] Warm starting.  
+- [ ] RAD style data augmentations.  
+- [ ] Playout cap randomization.  
+- [ ] Implement e-greedy and test it vs entropy regularization.  
+- [ ] Test BatchNorm.  
+- [ ] Implement improved Q-loss.
+- [ ] Different optimizers.
