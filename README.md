@@ -22,5 +22,4 @@ Base implementation.
 - [ ] Playout cap randomization.  
 - [ ] Implement e-greedy and test it vs entropy regularization.  
 - [ ] Test BatchNorm.  
-- [ ] Implement improved Q-loss.
 - [ ] Different optimizers.
