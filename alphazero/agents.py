@@ -1,4 +1,4 @@
-from alphazero.losses import A0CLoss
+from alphazero.losses import A0CLoss, A0CQLoss
 import torch
 import torch.nn.functional as F
 from torch.nn.utils import clip_grad_norm
@@ -11,9 +11,6 @@ from omegaconf.dictconfig import DictConfig
 from collections import defaultdict
 from typing import Dict, Tuple
 from abc import ABC, abstractmethod
-
-from torch.optim import optimizer
-
 from .helpers import stable_normalizer
 from .buffers import ReplayBuffer
 
@@ -139,18 +136,18 @@ class DiscreteAgent(Agent):
     ) -> Tuple[int, np.array, np.array, np.array]:
 
         self.mcts.search(Env=Env, mcts_env=mcts_env, simulation=simulation)
-        state, actions, counts, Q, V = self.mcts.return_results(self.final_selection)
+        state, actions, counts, Qs, V = self.mcts.return_results(self.final_selection)
 
         if self.final_selection == "max_value":
             # select final action based on max Q value
-            pi = stable_normalizer(Q, self.temperature)
+            pi = stable_normalizer(Qs, self.temperature)
             action = pi.argmax() if deterministic else np.random.choice(len(pi), p=pi)
         else:
             # select the final action based on visit counts
             pi = stable_normalizer(counts, self.temperature)
             action = pi.argmax() if deterministic else np.random.choice(len(pi), p=pi)
 
-        return action, state, actions, counts, V
+        return action, state, actions, counts, Qs, V
 
     def mcts_forward(self, action: int, node: np.array) -> None:
         self.mcts.forward(action, node)
@@ -235,18 +232,18 @@ class ContinuousAgent(Agent):
     ) -> Tuple[int, np.array, np.array, np.array]:
 
         self.mcts.search(Env=Env, mcts_env=mcts_env, simulation=simulation)
-        state, actions, counts, Q, V_hat = self.mcts.return_results(
+        state, actions, counts, Qs, V_hat = self.mcts.return_results(
             self.final_selection
         )
 
         if self.final_selection == "max_value":
             # select the action with the best action value
-            action = actions[Q.argmax()][np.newaxis]
+            action = actions[Qs.argmax()][np.newaxis]
         else:
             # select the action that was visited most
             action = actions[counts.argmax()][np.newaxis]
 
-        return action, state, actions, counts, V_hat
+        return action, state, actions, counts, Qs, V_hat
 
     def update(
         self, obs: Tuple[np.array, np.array, np.array, np.array]
@@ -256,7 +253,7 @@ class ContinuousAgent(Agent):
         for param in self.nn.parameters():
             param.grad = None
 
-        states, actions, counts, V_target = obs
+        states, actions, counts, Qs, V_target = obs
 
         actions_tensor = torch.from_numpy(actions).float().to(self.device)
         states_tensor = torch.from_numpy(states).float().to(self.device)
@@ -264,19 +261,29 @@ class ContinuousAgent(Agent):
             torch.from_numpy(V_target).unsqueeze(dim=1).float().to(self.device)
         )
 
-        counts_tensor = torch.from_numpy(counts).float().to(self.device)
-
         log_probs, entropy, V_hat = self.nn.get_train_data(
             states_tensor, actions_tensor
         )
 
-        loss_dict = self.loss(
-            log_probs=log_probs,
-            counts=counts_tensor,
-            entropy=entropy,
-            V=values_tensor,
-            V_hat=V_hat,
-        )
+        if isinstance(self.loss, A0CQLoss):
+            Q_tensor = torch.from_numpy(Qs).squeeze().float().to(self.device)
+            loss_dict = self.loss(
+                log_probs=log_probs,
+                Qs=Q_tensor,
+                entropy=entropy,
+                V=values_tensor,
+                V_hat=V_hat,
+            )
+        else:
+            counts_tensor = torch.from_numpy(counts).float().to(self.device)
+            loss_dict = self.loss(
+                log_probs=log_probs,
+                counts=counts_tensor,
+                entropy=entropy,
+                V=values_tensor,
+                V_hat=V_hat,
+            )
+
         loss_dict["loss"].backward()
 
         if self.clip:

@@ -3,7 +3,7 @@ defaults:
   - mcts: MCTSContinuous
   - optimizer: RMSProp
   - network: NetworkContinuous
-  - loss: A0CLoss
+  - loss: A0CQLoss
   - hydra/sweeper: ax
     
 

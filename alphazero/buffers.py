@@ -19,7 +19,9 @@ class ReplayBuffer:
         self.insert_index = 0
         self.size = 0
 
-    def store(self, experience: Tuple[np.array, np.array, np.array]) -> None:
+    def store(
+        self, experience: Tuple[np.array, np.array, np.array, np.array, np.array]
+    ) -> None:
         if self.size < self.max_size:
             self.experience.append(experience)
             self.size += 1
@@ -65,7 +67,7 @@ class ReplayBuffer:
         self.sample_index += self.batch_size
 
         # reshape experience into batches
-        states, actions, counts, values = map(np.stack, zip(*batch))
-        return states, actions, counts, values
+        states, actions, counts, Qs, values = map(np.stack, zip(*batch))
+        return states, actions, counts, Qs, values
 
     next = __next__
