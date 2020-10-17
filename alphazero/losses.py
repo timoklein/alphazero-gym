@@ -221,18 +221,16 @@ class A0CQLoss(Loss):
         self.reduction = reduction
 
     def _calculate_policy_loss(
-        self, log_probs: torch.Tensor, Qs: torch.Tensor, V_hat: torch.Tensor
+        self, log_probs: torch.Tensor, counts: torch.Tensor, V_hat: torch.Tensor
     ) -> torch.Tensor:
 
-        # this uses an experimental scaling term for the policy loss
-        # idea: where the mcts action value differs a lot from the
-        # network value estimate, we want to train more
+        # tf.stop_gradient(self.log_pi_a_s - tf.squeeze((n_a * temp) - self.V_hat, axis=1)) * self.log_pi_a_s
         with torch.no_grad():
             # calculate scaling term
-            Q_diff = -torch.abs((Qs - V_hat).squeeze())
+            log_diff = log_probs - (self.tau * counts - V_hat).squeeze()
 
         # multiple with log_probs gradient
-        policy_loss = torch.einsum("ni, ni -> n", Q_diff, log_probs)
+        policy_loss = torch.einsum("ni, ni -> n", log_diff, log_probs)
 
         if self.reduction == "mean":
             return policy_loss.mean()
@@ -253,13 +251,13 @@ class A0CQLoss(Loss):
     def forward(
         self,
         log_probs: torch.Tensor,
-        Qs: torch.tensor,
+        counts: torch.tensor,
         entropy: torch.Tensor,
         V: torch.Tensor,
         V_hat: torch.Tensor,
     ) -> Dict[str, torch.Tensor]:
         policy_loss = self.policy_coeff * self._calculate_policy_loss(
-            log_probs, Qs, V_hat
+            log_probs, counts, V_hat
         )
         value_loss = self.value_coeff * self._calculate_value_loss(V_hat, V)
         entropy_loss = self.alpha * self._calculate_entropy_loss(entropy)
@@ -332,13 +330,13 @@ class A0CQLossTuned(A0CQLoss):
     def forward(
         self,
         log_probs: torch.Tensor,
-        Qs: torch.tensor,
+        counts: torch.tensor,
         entropy: torch.Tensor,
         V: torch.Tensor,
         V_hat: torch.Tensor,
     ) -> Dict[str, torch.Tensor]:
         policy_loss = self.policy_coeff * self._calculate_policy_loss(
-            log_probs, Qs, V_hat
+            log_probs, counts, V_hat
         )
         value_loss = self.value_coeff * self._calculate_value_loss(V_hat, V)
         entropy_loss = self.alpha.detach() * self._calculate_entropy_loss(entropy)

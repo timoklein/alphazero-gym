@@ -158,7 +158,8 @@ class DiscreteAgent(Agent):
         for param in self.nn.parameters():
             param.grad = None
 
-        states, actions, counts, V_target = obs
+        # Qs are currently unused in update setp
+        states, actions, counts, _, V_target = obs
         states_tensor = torch.from_numpy(states).float().to(self.device)
         values_tensor = (
             torch.from_numpy(V_target).unsqueeze(dim=1).float().to(self.device)
@@ -253,10 +254,12 @@ class ContinuousAgent(Agent):
         for param in self.nn.parameters():
             param.grad = None
 
-        states, actions, counts, Qs, V_target = obs
+        # Qs are currently unused in update
+        states, actions, counts, _, V_target = obs
 
         actions_tensor = torch.from_numpy(actions).float().to(self.device)
         states_tensor = torch.from_numpy(states).float().to(self.device)
+        counts_tensor = torch.from_numpy(counts).float().to(self.device)
         values_tensor = (
             torch.from_numpy(V_target).unsqueeze(dim=1).float().to(self.device)
         )
@@ -265,24 +268,13 @@ class ContinuousAgent(Agent):
             states_tensor, actions_tensor
         )
 
-        if isinstance(self.loss, A0CQLoss):
-            Q_tensor = torch.from_numpy(Qs).squeeze().float().to(self.device)
-            loss_dict = self.loss(
-                log_probs=log_probs,
-                Qs=Q_tensor,
-                entropy=entropy,
-                V=values_tensor,
-                V_hat=V_hat,
-            )
-        else:
-            counts_tensor = torch.from_numpy(counts).float().to(self.device)
-            loss_dict = self.loss(
-                log_probs=log_probs,
-                counts=counts_tensor,
-                entropy=entropy,
-                V=values_tensor,
-                V_hat=V_hat,
-            )
+        loss_dict = self.loss(
+            log_probs=log_probs,
+            counts=counts_tensor,
+            entropy=entropy,
+            V=values_tensor,
+            V_hat=V_hat,
+        )
 
         loss_dict["loss"].backward()
 

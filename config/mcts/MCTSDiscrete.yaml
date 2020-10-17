@@ -2,7 +2,7 @@
 _target_: alphazero.mcts.MCTSDiscrete
 num_actions: ${network.action_dim}
 is_atari: ${agent.is_atari}
-n_rollouts: 25
+n_rollouts: 8
 gamma: 1
 c_uct: 1.5
 V_target_policy: on_policy # can be either on_policy, off_policy or greedy
