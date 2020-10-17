@@ -1,3 +1,4 @@
+from datetime import datetime
 import numpy as np
 from tqdm import trange
 import wandb
@@ -43,6 +44,7 @@ def run_continuous_agent(cfg: DictConfig):
     agent = hydra.utils.instantiate(cfg.agent)
 
     config = {
+        "Date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "Environment": Env.unwrapped.spec.id,
         "Environment seed": cfg.seed,
         "Training episodes": cfg.num_train_episodes,

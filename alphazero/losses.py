@@ -229,7 +229,7 @@ class A0CQLoss(Loss):
         # network value estimate, we want to train more
         with torch.no_grad():
             # calculate scaling term
-            Q_diff = (Qs - V_hat).squeeze()
+            Q_diff = torch.abs((Qs - V_hat).squeeze())
 
         # multiple with log_probs gradient
         policy_loss = torch.einsum("ni, ni -> n", Q_diff, log_probs)
