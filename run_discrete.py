@@ -59,10 +59,14 @@ def run_discrete_agent(cfg: DictConfig):
         "MCTS rollouts": cfg.mcts.n_rollouts,
         "UCT constant": cfg.mcts.c_uct,
         "Discount factor": cfg.mcts.gamma,
+        "MCTS epsilon greedy": cfg.mcts.epsilon,
         "V target policy": cfg.mcts.V_target_policy,
         "Final selection policy": cfg.agent.final_selection,
         "Network hidden layers": cfg.network.n_hidden_layers,
         "Network hidden units": cfg.network.n_hidden_units,
+        "Optimizer": "Adam"
+        if cfg.optimizer._target_ == "torch.optim.Adam"
+        else "RMSProp",
         "Learning rate": cfg.optimizer.lr,
         "Policy coefficient": cfg.agent.loss_cfg.policy_coeff,
         "Value coefficient": cfg.agent.loss_cfg.value_coeff,

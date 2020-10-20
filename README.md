@@ -10,7 +10,6 @@ Base implementation.
 
 ## TDOS
 - [ ] Add  model saving and loading using the config for instantiation.  
-- [ ] Add mixed precision training.  
 
 
 ## Possible Enhancements to try
@@ -19,5 +18,4 @@ Base implementation.
 - [ ] Warm starting.  
 - [ ] RAD style data augmentations.  
 - [ ] Playout cap randomization.  
-- [ ] Implement e-greedy and test it vs entropy regularization.  
-- [ ] Test BatchNorm.  
+- [ ] Test L2 reg (BatchNorm makes no sense for multimodal data).  

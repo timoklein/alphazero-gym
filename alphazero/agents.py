@@ -1,4 +1,4 @@
-from alphazero.losses import A0CLoss, A0CQLoss
+from alphazero.losses import A0CLoss
 import torch
 import torch.nn.functional as F
 from torch.nn.utils import clip_grad_norm
@@ -7,7 +7,7 @@ import gym
 import hydra
 from omegaconf.dictconfig import DictConfig
 
-
+import random
 from collections import defaultdict
 from typing import Dict, Tuple
 from abc import ABC, abstractmethod
@@ -208,6 +208,7 @@ class ContinuousAgent(Agent):
         loss_cfg: DictConfig,
         optimizer_cfg: DictConfig,
         final_selection: str,
+        epsilon: float,
         train_epochs: int,
         grad_clip: float,
         device: str,
@@ -224,9 +225,21 @@ class ContinuousAgent(Agent):
             device=device,
         )
 
+        self.epsilon = epsilon
+
     @property
     def action_limit(self) -> float:
         return self.nn.act_limit
+
+    def epsilon_greedy(self, actions: np.array, values: np.array) -> np.array:
+        assert (
+            len(actions) == len(values),
+            "Epsilon greedy requires equal array sizes",
+        )
+        if random.random() < self.epsilon:
+            return np.random.choice(actions)[np.newaxis]
+        else:
+            return actions[values.argmax()][np.newaxis]
 
     def act(
         self, Env: gym.Env, mcts_env: gym.Env, simulation: bool = False,
@@ -238,11 +251,17 @@ class ContinuousAgent(Agent):
         )
 
         if self.final_selection == "max_value":
-            # select the action with the best action value
-            action = actions[Qs.argmax()][np.newaxis]
+            if self.epsilon == 0:
+                # select the action with the best action value
+                action = actions[Qs.argmax()][np.newaxis]
+            else:
+                action = self.epsilon_greedy(actions=actions, values=Qs)
         else:
-            # select the action that was visited most
-            action = actions[counts.argmax()][np.newaxis]
+            if self.epsilon == 0:
+                # select the action that was visited most
+                action = actions[counts.argmax()][np.newaxis]
+            else:
+                action = self.epsilon_greedy(actions=actions, values=counts)
 
         return action, state, actions, counts, Qs, V_hat
 

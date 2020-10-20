@@ -5,6 +5,7 @@ is_atari: ${agent.is_atari}
 n_rollouts: 8
 gamma: 1
 c_uct: 1.5
+epsilon: 0.1
 V_target_policy: on_policy # can be either on_policy, off_policy or greedy
 device: ${device}
 root_state: null

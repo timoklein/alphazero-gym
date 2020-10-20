@@ -1,4 +1,5 @@
 import copy
+import random
 from typing import Tuple
 import gym
 import torch
@@ -26,6 +27,7 @@ class MCTS(ABC):
         n_rollouts: int,
         c_uct: float,
         gamma: float,
+        epsilon: float,
         device: str,
         V_target_policy: str,
         root_state: np.array,
@@ -39,6 +41,7 @@ class MCTS(ABC):
         self.n_rollouts = n_rollouts
         self.c_uct = c_uct
         self.gamma = gamma
+        self.epsilon = epsilon
         self.V_target_policy = V_target_policy
 
     @abstractmethod
@@ -79,6 +82,14 @@ class MCTS(ABC):
 
         Q = np.array([child_action.Q for child_action in node.child_actions])
         return Q.max()
+
+    def epsilon_greedy(self, node: Node, UCT: np.array) -> Action:
+        if random.random() < self.epsilon:
+            # return a random child if the epsilon greedy conditions are met
+            return node.child_actions[random.randint(0, len(node.child_actions) - 1)]
+        else:
+            winner = argmax(UCT)
+            return node.child_actions[winner]
 
     @staticmethod
     def selection(action: Action) -> Node:
@@ -147,6 +158,7 @@ class MCTSDiscrete(MCTS):
         n_rollouts: int,
         c_uct: float,
         gamma: float,
+        epsilon: float,
         V_target_policy: str,
         device: str,
         root_state: np.array,
@@ -158,6 +170,7 @@ class MCTSDiscrete(MCTS):
             n_rollouts=n_rollouts,
             c_uct=c_uct,
             gamma=gamma,
+            epsilon=epsilon,
             V_target_policy=V_target_policy,
             device=device,
             root_state=root_state,
@@ -226,7 +239,7 @@ class MCTSDiscrete(MCTS):
                 restore_atari_state(mcts_env, snapshot)
 
             while not node.terminal:
-                action = self.selectionUCT(self.c_uct, node)
+                action = self.selectionUCT(node)
 
                 # take step
                 new_state, reward, terminal, _ = mcts_env.step(action.action)
@@ -248,18 +261,21 @@ class MCTSDiscrete(MCTS):
 
             self.backprop(node, self.gamma)
 
-    @staticmethod
-    def selectionUCT(c_uct, node: NodeDiscrete) -> ActionDiscrete:
+    def selectionUCT(self, node: NodeDiscrete) -> ActionDiscrete:
         """ Select one of the child actions based on UCT rule """
         UCT = np.array(
             [
                 child_action.Q
-                + prior * c_uct * (np.sqrt(node.n + 1) / (child_action.n + 1))
+                + prior * self.c_uct * (np.sqrt(node.n + 1) / (child_action.n + 1))
                 for child_action, prior in zip(node.child_actions, node.priors)
             ]
         )
-        winner = argmax(UCT)
-        return node.child_actions[winner]
+        if self.epsilon == 0:
+            # do standard UCT action selection if epsilon=0
+            winner = argmax(UCT)
+            return node.child_actions[winner]
+        else:
+            return self.epsilon_greedy(node=node, UCT=UCT)
 
     def forward(self, action: int, state: np.array) -> None:
         """ Move the root forward """
@@ -293,6 +309,7 @@ class MCTSContinuous(MCTS):
         c_pw: float,
         kappa: float,
         gamma: float,
+        epsilon: float,
         V_target_policy: str,
         device: str,
         root_state: np.array,
@@ -303,6 +320,7 @@ class MCTSContinuous(MCTS):
             n_rollouts=n_rollouts,
             c_uct=c_uct,
             gamma=gamma,
+            epsilon=epsilon,
             V_target_policy=V_target_policy,
             device=device,
             root_state=root_state,
@@ -385,6 +403,7 @@ class MCTSContinuous(MCTS):
 
     def selectionUCT(self, node: NodeContinuous) -> ActionContinuous:
         """ Select one of the child actions based on UCT rule """
+        # no epsilon greedy if we add a node with progressive widening
         if node.check_pw(self.c_pw, self.kappa):
             self.add_pw_action(node)
             return node.child_actions[-1]
@@ -396,5 +415,9 @@ class MCTSContinuous(MCTS):
                     for child_action in node.child_actions
                 ]
             )
-            winner = argmax(UCT)
-            return node.child_actions[winner]
+            if self.epsilon == 0:
+                # do standard UCT action selection if epsilon=0
+                winner = argmax(UCT)
+                return node.child_actions[winner]
+            else:
+                return self.epsilon_greedy(node=node, UCT=UCT)
