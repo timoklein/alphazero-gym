@@ -5,7 +5,7 @@ import wandb
 import hydra
 from omegaconf.dictconfig import DictConfig
 
-from alphazero.losses import A0CLossTuned, A0CLoss, A0CQLoss, A0CQLossTuned
+from alphazero.losses import A0CLossTuned, A0CLoss
 from alphazero.helpers import store_actions
 from alphazero.helpers import check_space, is_atari_game
 from rl.make_game import make_game
@@ -89,22 +89,6 @@ def run_discrete_agent(cfg: DictConfig):
                 "Loss type": "A0C loss untuned",
             }
         )
-    elif isinstance(agent.loss, A0CQLossTuned):
-        config.update(
-            {
-                "Temperature tau": cfg.agent.loss_cfg.tau,
-                "Loss lr": 0.001,
-                "Loss type": "A0C Q loss tuned",
-            }
-        )
-    elif isinstance(agent.loss, A0CQLoss):
-        config.update(
-            {
-                "Temperature tau": cfg.agent.loss_cfg.tau,
-                "Entropy coeff [alpha]": cfg.agent.loss_cfg.alpha,
-                "Loss type": "A0C Q loss untuned",
-            }
-        )
     else:
         config["Loss type"] = "AlphaZero loss"
 
@@ -151,9 +135,7 @@ def run_discrete_agent(cfg: DictConfig):
         info_dict = agent.train(buffer)
         info_dict["Episode reward"] = R
         info_dict["Episode reward"] = R
-        if isinstance(agent.loss, A0CLossTuned) or isinstance(
-            agent.loss, A0CQLossTuned
-        ):
+        if isinstance(agent.loss, A0CLossTuned):
             info_dict["alpha"] = agent.loss.alpha.detach().cpu().item()
 
         # agent.save_checkpoint(env=Env)

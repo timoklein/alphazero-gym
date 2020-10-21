@@ -5,7 +5,7 @@ import wandb
 import hydra
 from omegaconf.dictconfig import DictConfig
 
-from alphazero.losses import A0CLossTuned, A0CLoss, A0CQLoss, A0CQLossTuned
+from alphazero.losses import A0CLossTuned, A0CLoss
 from alphazero.helpers import check_space, store_actions
 from rl.make_game import make_game
 
@@ -89,21 +89,6 @@ def run_continuous_agent(cfg: DictConfig):
                 "Loss type": "A0C loss untuned",
             }
         )
-    elif isinstance(agent.loss, A0CQLossTuned):
-        config.update(
-            {
-                "Target entropy": -cfg.agent.loss_cfg.action_dim,
-                "Loss lr": 0.001,
-                "Loss type": "A0C Q loss tuned",
-            }
-        )
-    elif isinstance(agent.loss, A0CQLoss):
-        config.update(
-            {
-                "Entropy coeff [alpha]": cfg.agent.loss_cfg.alpha,
-                "Loss type": "A0C Q loss untuned",
-            }
-        )
 
     run = wandb.init(name="A0C", project="a0c", config=config)
 
@@ -148,9 +133,7 @@ def run_continuous_agent(cfg: DictConfig):
         # agent.save_checkpoint(env=Env)
 
         info_dict["Episode reward"] = R
-        if isinstance(agent.loss, A0CLossTuned) or isinstance(
-            agent.loss, A0CQLossTuned
-        ):
+        if isinstance(agent.loss, A0CLossTuned):
             info_dict["alpha"] = agent.loss.alpha.detach().cpu().item()
 
         run.log(
