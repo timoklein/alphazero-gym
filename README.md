@@ -10,6 +10,13 @@ Base implementation.
 
 ## TDOS
 - [ ] Add  model saving and loading using the config for instantiation.  
+- [ ] Add new policy classes.  
+- [ ] Fix WandB logging.  
+- [ ] Make an installable package.  
+- [ ] Add typing.  
+- [ ] Fix Hydra instantiation.   
+- [ ] Docs. 
+- [ ] Delete tf branch.  
 
 
 ## Possible Enhancements to try

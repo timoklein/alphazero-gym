@@ -1,12 +1,12 @@
 # @package _global_
 agent:
-  _target_: alphazero.agents.ContinuousAgent
-  network_cfg: ${network}
+  _target_: alphazero.agent.agents.ContinuousAgent
+  policy_cfg: ${policy}
   mcts_cfg: ${mcts}
   loss_cfg: ${loss}
   optimizer_cfg: ${optimizer}
   train_epochs: ${num_train_epochs}
   final_selection: max_visit # can be max_visit or max_value
-  epsilon: 0.1
+  epsilon: 0 # epsilon greedy action selection if eps > 0
   grad_clip: 0
   device: ${device}

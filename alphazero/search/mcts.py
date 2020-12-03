@@ -6,7 +6,7 @@ import torch
 import numpy as np
 from abc import ABC, abstractmethod
 
-from .states import (
+from alphazero.search.states import (
     Action,
     Node,
     ActionContinuous,
@@ -14,7 +14,7 @@ from .states import (
     NodeContinuous,
     NodeDiscrete,
 )
-from .helpers import copy_atari_state, restore_atari_state, argmax
+from alphazero.helpers import argmax
 
 # scales the step reward between -1 and 0
 PENDULUM_R_SCALE = 16.2736044
@@ -45,11 +45,11 @@ class MCTS(ABC):
         self.V_target_policy = V_target_policy
 
     @abstractmethod
-    def selectionUCT(self):
+    def selectionUCT(self, node: Node) -> Action:
         ...
 
     @abstractmethod
-    def search(self):
+    def search(self, Env: gym.Env, mcts_env: gym.Env, simulation: bool) -> None:
         ...
 
     @staticmethod
@@ -83,6 +83,7 @@ class MCTS(ABC):
         Q = np.array([child_action.Q for child_action in node.child_actions])
         return Q.max()
 
+    # TODO: Factor out
     def epsilon_greedy(self, node: Node, UCT: np.array) -> Action:
         if random.random() < self.epsilon:
             # return a random child if the epsilon greedy conditions are met
@@ -104,7 +105,7 @@ class MCTS(ABC):
 
     @staticmethod
     def simulation(mcts_env: gym.Env) -> np.array:
-        V = 0
+        V = np.zeros(1)
         terminal = False
         while not terminal:
             action = mcts_env.action_space.sample()
@@ -126,7 +127,7 @@ class MCTS(ABC):
 
     def return_results(
         self, final_selection: str
-    ) -> Tuple[np.array, np.array, np.array, np.array]:
+    ) -> Tuple[np.array, np.array, np.array, np.array, np.array]:
         """ Process the output at the root node """
         actions = np.array(
             [child_action.action for child_action in self.root_node.child_actions]
@@ -154,7 +155,6 @@ class MCTSDiscrete(MCTS):
         self,
         model: torch.nn.Module,
         num_actions: int,
-        is_atari: bool,
         n_rollouts: int,
         c_uct: float,
         gamma: float,
@@ -178,9 +178,8 @@ class MCTSDiscrete(MCTS):
         )
 
         self.num_actions = num_actions
-        self.is_atari = is_atari
 
-    def initialize_search(self) -> None:
+    def initialize_search(self, env: gym.Env) -> None:
         if self.root_node is None:
             self.root_node = NodeDiscrete(
                 self.root_state,
@@ -194,10 +193,6 @@ class MCTSDiscrete(MCTS):
             self.root_node.parent_action = None
         if self.root_node.terminal:
             raise ValueError("Can't do tree search from a terminal node")
-
-        # for Atari: snapshot the root at the beginning
-        if self.is_atari:
-            snapshot = copy_atari_state(Env)
 
     def evaluation(self, node: NodeDiscrete, V: float = None) -> None:
         state = torch.from_numpy(node.state[None,]).float().to(self.device)
@@ -218,10 +213,10 @@ class MCTSDiscrete(MCTS):
         ]
         node.priors = self.model.predict_pi(state).flatten()
 
-    def search(self, Env: gym.Env, mcts_env: gym.Env, simulation: bool):
+    def search(self, Env: gym.Env, mcts_env: gym.Env, simulation: bool) -> None:
         """ Perform the MCTS search from the root """
 
-        self.initialize_search()
+        snapshot = self.initialize_search(env=Env)
         if simulation:
             mcts_env = copy.deepcopy(Env)
             V = self.simulation(mcts_env)
@@ -232,11 +227,8 @@ class MCTSDiscrete(MCTS):
             # reset to root for new trace
             node = self.root_node
 
-            if not self.is_atari:
-                # copy original Env to rollout from
-                mcts_env = copy.deepcopy(Env)
-            else:
-                restore_atari_state(mcts_env, snapshot)
+            # copy original Env to rollout from
+            mcts_env = copy.deepcopy(Env)
 
             while not node.terminal:
                 action = self.selectionUCT(node)
@@ -358,7 +350,7 @@ class MCTSContinuous(MCTS):
         new_child = ActionContinuous(action, parent_node=node, Q_init=node.V)
         node.child_actions.append(new_child)
 
-    def search(self, Env: gym.Env, mcts_env: gym.Env, simulation: bool):
+    def search(self, Env: gym.Env, mcts_env: gym.Env, simulation: bool) -> None:
         """ Perform the MCTS search from the root """
 
         self.initialize_search()
@@ -401,7 +393,7 @@ class MCTSContinuous(MCTS):
 
             self.backprop(node, self.gamma)
 
-    def selectionUCT(self, node: NodeContinuous) -> ActionContinuous:
+    def selectionUCT(self, node: NodeContinuous) -> ActionContinuous:  # type: ignore[return-value, override]
         """ Select one of the child actions based on UCT rule """
         # no epsilon greedy if we add a node with progressive widening
         if node.check_pw(self.c_pw, self.kappa):

@@ -1,3 +1,4 @@
+from copy import deepcopy
 from datetime import datetime
 import numpy as np
 from tqdm import trange
@@ -5,7 +6,7 @@ import wandb
 import hydra
 from omegaconf.dictconfig import DictConfig
 
-from alphazero.losses import A0CLossTuned, A0CLoss
+from alphazero.agent.losses import A0CLossTuned, A0CLoss
 from alphazero.helpers import check_space, store_actions
 from rl.make_game import make_game
 
@@ -36,12 +37,21 @@ def run_continuous_agent(cfg: DictConfig):
     ), "Using continuous agent for a discrete action space!"
 
     # set config environment values
-    cfg.network.state_dim = state_dim[0]
-    cfg.network.action_dim = action_dim[0]
+    cfg.policy.representation_dim = state_dim[0]
+    cfg.policy.action_dim = action_dim[0]
     # assumes that all dimensions of the action space are equally bound
-    cfg.network.act_limit = float(Env.action_space.high[0])
+    cfg.policy.action_bound = float(Env.action_space.high[0])
+    # cfg.policy.action_bound = None
 
     agent = hydra.utils.instantiate(cfg.agent)
+    print(agent.nn.bounds)
+
+    if cfg.policy.distribution == "beta":
+        distribution = "Beta"
+    elif cfg.policy.distribution == "normal" and cfg.policy.action_bound:
+        distribution = "Squashed Normal"
+    else:
+        distribution = "Normal"
 
     config = {
         "Date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -61,9 +71,15 @@ def run_continuous_agent(cfg: DictConfig):
         "V target policy": cfg.mcts.V_target_policy,
         "Final selection policy": cfg.agent.final_selection,
         "Agent epsilon greedy": cfg.agent.epsilon,
-        "Network hidden layers": cfg.network.n_hidden_layers,
-        "Network hidden units": cfg.network.n_hidden_units,
-        "Num mixture components": cfg.network.num_components,
+        "Network hidden layers": cfg.policy.hidden_dimensions,
+        "Network hidden units": len(cfg.policy.hidden_dimensions),
+        "Network nonlinearity": cfg.policy.nonlinearity,
+        "LayerNorm": cfg.policy.layernorm,
+        "Clamp log param": True,
+        "Clamp loss": "Log prob scaling",
+        "Log prob scale": cfg.policy.log_prob_scale,
+        "Num mixture components": cfg.policy.num_components,
+        "Distribution": distribution,
         "Optimizer": "Adam"
         if cfg.optimizer._target_ == "torch.optim.Adam"
         else "RMSProp",
@@ -116,7 +132,7 @@ def run_continuous_agent(cfg: DictConfig):
             if terminal or t == cfg.max_episode_length - 1:
                 if R_max < R:
                     actions_list.insert(0, Env.seed())
-                    best_actions = actions_list
+                    best_actions = deepcopy(actions_list)
                     R_max = R
                     store_actions(cfg.game, best_actions)
                 actions_list.clear()

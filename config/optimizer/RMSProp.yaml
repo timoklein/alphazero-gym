@@ -4,4 +4,4 @@ lr: 0.001
 momentum: 0
 weight_decay: 0
 alpha: 0.9
-eps: 1e-07
+eps: 1e-10

@@ -1,7 +1,6 @@
 # @package _group_
-_target_: alphazero.mcts.MCTSDiscrete
-num_actions: ${network.action_dim}
-is_atari: ${agent.is_atari}
+_target_: alphazero.search.mcts.MCTSDiscrete
+num_actions: ${policy.num_actions}
 n_rollouts: 8
 gamma: 1
 c_uct: 1.5

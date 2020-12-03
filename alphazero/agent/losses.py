@@ -1,6 +1,5 @@
 import numpy as np
 import torch
-from torch._C import dtype
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.utils import clip_grad_norm
@@ -16,15 +15,22 @@ class Loss(nn.Module):
         ...
 
     @abstractmethod
-    def _calculate_policy_loss(self):
+    def _calculate_policy_loss(self) -> torch.Tensor:
         ...
 
     @abstractmethod
-    def _calculate_value_loss(self):
+    def _calculate_value_loss(
+        self, V_hat: torch.Tensor, V: torch.Tensor
+    ) -> torch.Tensor:
         ...
 
 
 class AlphaZeroLoss(Loss):
+
+    policy_coeff: float
+    value_coeff: float
+    reduction: str
+
     def __init__(self, policy_coeff: float, value_coeff: float, reduction: str) -> None:
         super().__init__()
 
@@ -34,7 +40,7 @@ class AlphaZeroLoss(Loss):
         self.value_coeff = value_coeff
         self.reduction = reduction
 
-    def _calculate_policy_loss(
+    def _calculate_policy_loss(  # type: ignore[override]
         self, pi_prior_logits: torch.Tensor, pi_mcts: torch.Tensor
     ) -> torch.Tensor:
         # first we have to convert the probabilities to labels
@@ -47,7 +53,7 @@ class AlphaZeroLoss(Loss):
     ) -> torch.Tensor:
         return F.mse_loss(V_hat, V, reduction=self.reduction)
 
-    def forward(
+    def forward(  # type: ignore[override]
         self,
         pi_prior_logits: torch.Tensor,
         pi_mcts: torch.Tensor,
@@ -62,13 +68,23 @@ class AlphaZeroLoss(Loss):
         return {"loss": loss, "policy_loss": policy_loss, "value_loss": value_loss}
 
 
+# FIXME: Parameterize loss clamping
 class A0CLoss(Loss):
+
+    tau: float
+    policy_coeff: float
+    alpha: Union[float, torch.Tensor]
+    value_coeff: float
+    clamp: bool
+    reduction: str
+
     def __init__(
         self,
         tau: float,
         policy_coeff: float,
         alpha: Union[float, torch.Tensor],
         value_coeff: float,
+        clamp: bool,
         reduction: str,
     ) -> None:
         super().__init__()
@@ -76,9 +92,10 @@ class A0CLoss(Loss):
         self.policy_coeff = policy_coeff
         self.alpha = alpha
         self.value_coeff = value_coeff
+        self.clamp = clamp
         self.reduction = reduction
 
-    def _calculate_policy_loss(
+    def _calculate_policy_loss(  # type: ignore[override]
         self, log_probs: torch.Tensor, counts: torch.Tensor
     ) -> torch.Tensor:
 
@@ -86,8 +103,13 @@ class A0CLoss(Loss):
             # calculate scaling term
             log_diff = log_probs - self.tau * torch.log(counts)
 
-        # multiple with log_probs gradient
-        policy_loss = torch.einsum("ni, ni -> n", log_diff, log_probs)
+        # multiply with log_probs gradient
+        if self.clamp:
+            policy_loss = torch.clamp(
+                torch.einsum("ni, ni -> n", log_diff, log_probs), min=0, max=1
+            )
+        else:
+            policy_loss = torch.einsum("ni, ni -> n", log_diff, log_probs)
 
         if self.reduction == "mean":
             return policy_loss.mean()
@@ -105,10 +127,10 @@ class A0CLoss(Loss):
         else:
             return entropy.sum()
 
-    def forward(
+    def forward(  # type: ignore[override]
         self,
         log_probs: torch.Tensor,
-        counts: torch.tensor,
+        counts: torch.Tensor,
         entropy: torch.Tensor,
         V: torch.Tensor,
         V_hat: torch.Tensor,
@@ -126,6 +148,18 @@ class A0CLoss(Loss):
 
 
 class A0CLossTuned(A0CLoss):
+
+    tau: float
+    policy_coeff: float
+    alpha: torch.Tensor
+    value_coeff: float
+    clamp: bool
+    reduction: str
+    clip: float
+    device: torch.device
+    log_alpha: torch.Tensor
+    optimizer: torch.optim.Optimizer
+
     def __init__(
         self,
         action_dim: int,
@@ -134,14 +168,11 @@ class A0CLossTuned(A0CLoss):
         tau: float,
         policy_coeff: float,
         value_coeff: float,
+        clamp: bool,
         reduction: str,
         grad_clip: float,
         device: str,
     ) -> None:
-        self.tau = tau
-        self.policy_coeff = policy_coeff
-        self.value_coeff = value_coeff
-        self.reduction = reduction
         self.clip = grad_clip
         self.device = torch.device(device)
 
@@ -154,17 +185,18 @@ class A0CLossTuned(A0CLoss):
             device=self.device,
             dtype=torch.float32,
         )
-        # for simplicity: Use the same optimizer settings as for the neural network
 
         self.alpha = self.log_alpha.exp()
 
         self.optimizer = Adam([self.log_alpha], lr=lr)
 
+        # for simplicity: Use the same optimizer settings as for the neural network
         super().__init__(
             tau=tau,
             policy_coeff=policy_coeff,
             alpha=self.alpha,
             value_coeff=value_coeff,
+            clamp=clamp,
             reduction=reduction,
         )
 
@@ -182,17 +214,19 @@ class A0CLossTuned(A0CLoss):
 
         return alpha_loss.detach().cpu()
 
-    def forward(
+    def forward(  # type: ignore[override]
         self,
         log_probs: torch.Tensor,
-        counts: torch.tensor,
+        counts: torch.Tensor,
         entropy: torch.Tensor,
         V: torch.Tensor,
         V_hat: torch.Tensor,
     ) -> Dict[str, torch.Tensor]:
         policy_loss = self.policy_coeff * self._calculate_policy_loss(log_probs, counts)
         value_loss = self.value_coeff * self._calculate_value_loss(V_hat, V)
-        entropy_loss = self.alpha.detach() * self._calculate_entropy_loss(entropy)
+        entropy_loss = self.alpha.detach().item() * self._calculate_entropy_loss(
+            entropy
+        )
         loss = policy_loss + entropy_loss + value_loss
         alpha_loss = self._update_alpha(entropy)
         return {

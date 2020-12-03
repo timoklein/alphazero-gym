@@ -1,3 +1,4 @@
+from copy import deepcopy
 from datetime import datetime
 import numpy as np
 from tqdm import trange
@@ -5,9 +6,9 @@ import wandb
 import hydra
 from omegaconf.dictconfig import DictConfig
 
-from alphazero.losses import A0CLossTuned, A0CLoss
+from alphazero.agent.losses import A0CLossTuned, A0CLoss
 from alphazero.helpers import store_actions
-from alphazero.helpers import check_space, is_atari_game
+from alphazero.helpers import check_space
 from rl.make_game import make_game
 
 
@@ -20,8 +21,7 @@ def run_discrete_agent(cfg: DictConfig):
 
     # Environments
     Env = make_game(cfg.game)
-    is_atari = is_atari_game(Env)
-    mcts_env = make_game(cfg.game) if is_atari else None
+    mcts_env = None
 
     # set seeds
     np.random.seed(cfg.seed)
@@ -32,17 +32,15 @@ def run_discrete_agent(cfg: DictConfig):
 
     # get environment info
     state_dim, _ = check_space(Env.observation_space)
-    action_dim, action_discrete = check_space(Env.action_space)
-    is_atari = is_atari_game(Env)
+    num_actions, action_discrete = check_space(Env.action_space)
 
     assert (
         action_discrete == True
     ), "Can't use discrete agent for continuous action spaces!"
 
     # set config environment values
-    cfg.network.state_dim = state_dim[0]
-    cfg.network.action_dim = action_dim
-    cfg.agent.is_atari = is_atari
+    cfg.policy.representation_dim = state_dim[0]
+    cfg.policy.num_actions = num_actions[0]
 
     agent = hydra.utils.instantiate(cfg.agent)
 
@@ -62,8 +60,7 @@ def run_discrete_agent(cfg: DictConfig):
         "MCTS epsilon greedy": cfg.mcts.epsilon,
         "V target policy": cfg.mcts.V_target_policy,
         "Final selection policy": cfg.agent.final_selection,
-        "Network hidden layers": cfg.network.n_hidden_layers,
-        "Network hidden units": cfg.network.n_hidden_units,
+        "Network hidden layers": cfg.policy.hidden_dimensions,
         "Optimizer": "Adam"
         if cfg.optimizer._target_ == "torch.optim.Adam"
         else "RMSProp",
@@ -98,9 +95,6 @@ def run_discrete_agent(cfg: DictConfig):
     for ep in pbar:
         state = Env.reset()
         R = 0.0  # Total return counter
-        if is_atari:
-            mcts_env.reset()
-            mcts_env.seed(int(Env.seed()))
 
         agent.reset_mcts(root_state=state)
         for t in range(cfg.max_episode_length):
@@ -120,9 +114,8 @@ def run_discrete_agent(cfg: DictConfig):
             if terminal or t == cfg.max_episode_length - 1:
                 if R_max < R:
                     actions_list.insert(0, Env.seed()[0])
-                    best_actions = actions_list
+                    best_actions = deepcopy(actions_list)
                     R_max = R
-                    store_actions(cfg.game, best_actions)
                 actions_list.clear()
                 break
             else:

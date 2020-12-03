@@ -2,19 +2,19 @@ defaults:
   - agent: ContinuousAgent
   - mcts: MCTSContinuous
   - optimizer: RMSProp
-  - network: NetworkContinuous
-  - loss: A0CLoss
+  - policy: ContinuousPolicy
+  - loss: A0CLossTuned
   - hydra/sweeper: ax
     
 
 game: Pendulum-v0
 seed: 34
-num_train_episodes: 100
+num_train_episodes: 45
 max_episode_length: 200
 num_train_epochs: 1
 device: cpu
 
 buffer:
-  _target_: alphazero.buffers.ReplayBuffer
+  _target_: alphazero.agent.buffers.ReplayBuffer
   max_size: 3000
   batch_size: 32

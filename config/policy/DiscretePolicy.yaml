@@ -1,0 +1,9 @@
+# @package _group_
+_target_: alphazero.network.policies.make_policy # targets a function
+representation_dim: ??? # set later
+num_actions: ??? # set later
+action_dim: 1 # for classic control envs
+distribution: "discrete"
+hidden_dimensions: [128, 128]
+nonlinearity: "relu"
+layernorm: false

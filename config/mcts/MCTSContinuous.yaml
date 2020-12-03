@@ -1,11 +1,11 @@
 # @package _group_
-_target_: alphazero.mcts.MCTSContinuous
+_target_: alphazero.search.mcts.MCTSContinuous
 n_rollouts: 25
 c_pw: 1
 kappa: 0.5
 gamma: 1
 c_uct: 0.05
-epsilon: 0.1
-V_target_policy: on_policy # can be either on_policy, off_policy or greedy
+epsilon: 0 # epsilon greedy action selection if eps > 0
+V_target_policy: off_policy # can be either on_policy, off_policy or greedy
 device: ${device}
 root_state: null

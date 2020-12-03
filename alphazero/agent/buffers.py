@@ -1,11 +1,19 @@
 from __future__ import annotations
 import random
 import numpy as np
-from typing import Tuple
+from typing import List, Tuple
 
 
 class ReplayBuffer:
     """ Experience Replay Buffer  """
+
+    max_size: int
+    batch_size: int
+    sample_array: np.array
+    sample_index: int
+    insert_index: int
+    size: int
+    experience: List[Tuple[np.array, np.array, np.array, np.array, np.array]]
 
     def __init__(self, max_size: int, batch_size: int) -> None:
         self.max_size = max_size
@@ -31,13 +39,6 @@ class ReplayBuffer:
             if self.insert_index >= self.size:
                 self.insert_index = 0
 
-    def store_from_array(self, *args) -> None:
-        for i in range(args[0].shape[0]):
-            entry = []
-            for arg in args:
-                entry.append(arg[i])
-            self.store(entry)
-
     def reshuffle(self) -> None:
         self.sample_array = np.arange(self.size)
         random.shuffle(self.sample_array)
@@ -49,7 +50,7 @@ class ReplayBuffer:
     def __len__(self) -> int:
         return len(self.experience)
 
-    def __next__(self) -> Tuple[np.array, np.array, np.array, np.array]:
+    def __next__(self) -> Tuple[np.array, np.array, np.array, np.array, np.array]:
         if (self.sample_index + self.batch_size > self.size) and (
             not self.sample_index == 0
         ):

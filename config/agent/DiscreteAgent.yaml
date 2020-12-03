@@ -1,8 +1,7 @@
 # @package _global_
 agent:
-  _target_: alphazero.agents.DiscreteAgent
-  is_atari: ??? # set later
-  network_cfg: ${network}
+  _target_: alphazero.agent.agents.DiscreteAgent
+  policy_cfg: ${policy}
   mcts_cfg: ${mcts}
   loss_cfg: ${loss}
   optimizer_cfg: ${optimizer}

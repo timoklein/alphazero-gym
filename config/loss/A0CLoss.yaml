@@ -1,7 +1,8 @@
 # @package _group_
-_target_: alphazero.losses.A0CLoss
+_target_: alphazero.agent.losses.A0CLoss
 tau: 0.1
 policy_coeff: 1
-alpha: 0.1
+alpha: 1
 value_coeff: 1
+clamp: false
 reduction: mean

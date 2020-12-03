@@ -2,7 +2,7 @@ defaults:
   - agent: DiscreteAgent
   - mcts: MCTSDiscrete
   - optimizer: RMSProp
-  - network: NetworkDiscrete
+  - policy: DiscretePolicy
   - loss: A0CLossTuned
   - hydra/sweeper: ax
 
@@ -14,6 +14,6 @@ num_train_epochs: 1
 device: cpu
 
 buffer:
-  _target_: alphazero.buffers.ReplayBuffer
+  _target_: alphazero.agent.buffers.ReplayBuffer
   max_size: 1000
   batch_size: 32

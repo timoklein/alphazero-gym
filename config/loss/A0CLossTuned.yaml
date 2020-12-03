@@ -1,11 +1,12 @@
 # @package _group_
-_target_: alphazero.losses.A0CLossTuned
-action_dim: ${network.action_dim}
+_target_: alphazero.agent.losses.A0CLossTuned
+action_dim: ${policy.action_dim}
 alpha_init: 1
 lr: 0.001
 tau: 0.1
 policy_coeff: 1
 value_coeff: 1
+clamp: false
 reduction: mean
 grad_clip: ${agent.grad_clip}
 device: ${device}

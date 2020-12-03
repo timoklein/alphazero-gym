@@ -1,12 +1,12 @@
 from pathlib import Path
-from typing import Tuple, Union
+from typing import Any, Tuple, Union
 import gym
 import numpy as np
 import random
 from gym import spaces
 
 
-def stable_normalizer(x, temp) -> float:
+def stable_normalizer(x: np.array, temp: float) -> np.array:
     """ Computes x[i]**temp/sum_i(x[i]**temp) """
     x = (x / np.max(x)) ** temp
     return np.abs(x / np.sum(x))
@@ -23,7 +23,7 @@ def argmax(x):
     return winner
 
 
-def check_space(space) -> Tuple[Union[int, Tuple[int]], bool]:
+def check_space(space: Any) -> Tuple[Tuple[int], bool]:
     """ Check the properties of an environment state or action space """
     if isinstance(space, spaces.Box):
         dim = space.shape
@@ -33,6 +33,7 @@ def check_space(space) -> Tuple[Union[int, Tuple[int]], bool]:
         discrete = True
     else:
         raise NotImplementedError("This type of space is not supported")
+    dim = (dim,) if isinstance(dim, int) else dim
     return dim, discrete
 
 

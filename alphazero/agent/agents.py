@@ -1,4 +1,7 @@
-from alphazero.losses import A0CLoss
+import random
+from collections import defaultdict
+from typing import Any, Dict, Tuple
+from abc import ABC, abstractmethod
 import torch
 import torch.nn.functional as F
 from torch.nn.utils import clip_grad_norm
@@ -7,18 +10,16 @@ import gym
 import hydra
 from omegaconf.dictconfig import DictConfig
 
-import random
-from collections import defaultdict
-from typing import Dict, Tuple
-from abc import ABC, abstractmethod
-from .helpers import stable_normalizer
-from .buffers import ReplayBuffer
+from alphazero.helpers import stable_normalizer
+from alphazero.agent.buffers import ReplayBuffer
+from alphazero.network.policies import make_policy
+from alphazero.agent.losses import A0CLoss
 
 
 class Agent(ABC):
     def __init__(
         self,
-        network_cfg: DictConfig,
+        policy_cfg: DictConfig,
         loss_cfg: DictConfig,
         mcts_cfg: DictConfig,
         optimizer_cfg: DictConfig,
@@ -28,8 +29,9 @@ class Agent(ABC):
         device: str,
     ) -> None:
 
+        # instantiate network
         self.device = torch.device(device)
-        self.nn = hydra.utils.instantiate(network_cfg).to(self.device)
+        self.nn = hydra.utils.call(policy_cfg).to(torch.device(device))
         self.mcts = hydra.utils.instantiate(mcts_cfg, model=self.nn)
         self.loss = hydra.utils.instantiate(loss_cfg).to(self.device)
         self.optimizer = hydra.utils.instantiate(
@@ -41,11 +43,13 @@ class Agent(ABC):
         self.clip = grad_clip
 
     @abstractmethod
-    def act(self):
+    def act(self) -> Tuple[Any, np.array, np.array, np.array, np.array, np.array]:
         ...
 
     @abstractmethod
-    def update(self):
+    def update(
+        self, obs: Tuple[np.array, np.array, np.array, np.array, np.array]
+    ) -> Dict[str, float]:
         ...
 
     @property
@@ -84,9 +88,9 @@ class Agent(ABC):
         self.mcts.root_node = None
         self.mcts.root_state = root_state
 
-    def train(self, buffer: ReplayBuffer) -> float:
+    def train(self, buffer: ReplayBuffer) -> Dict[str, Any]:
         buffer.reshuffle()
-        running_loss = defaultdict(float)
+        running_loss: Dict[str, Any] = defaultdict(float)
         for epoch in range(self.train_epochs):
             for batches, obs in enumerate(buffer):
                 loss = self.update(obs)
@@ -100,8 +104,7 @@ class Agent(ABC):
 class DiscreteAgent(Agent):
     def __init__(
         self,
-        is_atari: bool,
-        network_cfg: DictConfig,
+        policy_cfg: DictConfig,
         mcts_cfg: DictConfig,
         loss_cfg: DictConfig,
         optimizer_cfg: DictConfig,
@@ -113,7 +116,7 @@ class DiscreteAgent(Agent):
     ) -> None:
 
         super().__init__(
-            network_cfg=network_cfg,
+            policy_cfg=policy_cfg,
             loss_cfg=loss_cfg,
             mcts_cfg=mcts_cfg,
             optimizer_cfg=optimizer_cfg,
@@ -122,18 +125,17 @@ class DiscreteAgent(Agent):
             grad_clip=grad_clip,
             device=device,
         )
-        self.is_atari = is_atari
 
         # initialize values
         self.temperature = temperature
 
-    def act(
+    def act(  # type: ignore[override]
         self,
         Env: gym.Env,
         mcts_env: gym.Env,
         simulation: bool = False,
         deterministic: bool = False,
-    ) -> Tuple[int, np.array, np.array, np.array]:
+    ) -> Tuple[Any, np.array, np.array, np.array, np.array, np.array]:
 
         self.mcts.search(Env=Env, mcts_env=mcts_env, simulation=simulation)
         state, actions, counts, Qs, V = self.mcts.return_results(self.final_selection)
@@ -152,13 +154,19 @@ class DiscreteAgent(Agent):
     def mcts_forward(self, action: int, node: np.array) -> None:
         self.mcts.forward(action, node)
 
-    def update(self, obs: Tuple[np.array, np.array, np.array]) -> Dict[str, float]:
+    def update(
+        self, obs: Tuple[np.array, np.array, np.array, np.array, np.array]
+    ) -> Dict[str, float]:
 
         # zero out gradients
         for param in self.nn.parameters():
             param.grad = None
 
         # Qs are currently unused in update setp
+        states: np.array
+        actions: np.array
+        counts: np.array
+        V_target: np.array
         states, actions, counts, _, V_target = obs
         states_tensor = torch.from_numpy(states).float().to(self.device)
         values_tensor = (
@@ -203,7 +211,7 @@ class DiscreteAgent(Agent):
 class ContinuousAgent(Agent):
     def __init__(
         self,
-        network_cfg: DictConfig,
+        policy_cfg: DictConfig,
         mcts_cfg: DictConfig,
         loss_cfg: DictConfig,
         optimizer_cfg: DictConfig,
@@ -215,7 +223,7 @@ class ContinuousAgent(Agent):
     ) -> None:
 
         super().__init__(
-            network_cfg=network_cfg,
+            policy_cfg=policy_cfg,
             loss_cfg=loss_cfg,
             mcts_cfg=mcts_cfg,
             optimizer_cfg=optimizer_cfg,
@@ -231,24 +239,19 @@ class ContinuousAgent(Agent):
     def action_limit(self) -> float:
         return self.nn.act_limit
 
+    # TODO: Factor out
     def epsilon_greedy(self, actions: np.array, values: np.array) -> np.array:
-        assert (
-            len(actions) == len(values),
-            "Epsilon greedy requires equal array sizes",
-        )
         if random.random() < self.epsilon:
             return np.random.choice(actions)[np.newaxis]
         else:
             return actions[values.argmax()][np.newaxis]
 
-    def act(
+    def act(  # type: ignore[override]
         self, Env: gym.Env, mcts_env: gym.Env, simulation: bool = False,
-    ) -> Tuple[int, np.array, np.array, np.array]:
+    ) -> Tuple[Any, np.array, np.array, np.array, np.array, np.array]:
 
         self.mcts.search(Env=Env, mcts_env=mcts_env, simulation=simulation)
-        state, actions, counts, Qs, V_hat = self.mcts.return_results(
-            self.final_selection
-        )
+        state, actions, counts, Qs, V = self.mcts.return_results(self.final_selection)
 
         if self.final_selection == "max_value":
             if self.epsilon == 0:
@@ -263,10 +266,10 @@ class ContinuousAgent(Agent):
             else:
                 action = self.epsilon_greedy(actions=actions, values=counts)
 
-        return action, state, actions, counts, Qs, V_hat
+        return action, state, actions, counts, Qs, V
 
     def update(
-        self, obs: Tuple[np.array, np.array, np.array, np.array]
+        self, obs: Tuple[np.array, np.array, np.array, np.array, np.array]
     ) -> Dict[str, float]:
 
         # zero out gradients
@@ -274,6 +277,10 @@ class ContinuousAgent(Agent):
             param.grad = None
 
         # Qs are currently unused in update
+        states: np.array
+        actions: np.array
+        counts: np.array
+        V_target: np.array
         states, actions, counts, _, V_target = obs
 
         actions_tensor = torch.from_numpy(actions).float().to(self.device)
