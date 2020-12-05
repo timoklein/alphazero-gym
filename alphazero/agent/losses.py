@@ -75,7 +75,6 @@ class A0CLoss(Loss):
     policy_coeff: float
     alpha: Union[float, torch.Tensor]
     value_coeff: float
-    clamp: bool
     reduction: str
 
     def __init__(
@@ -84,7 +83,6 @@ class A0CLoss(Loss):
         policy_coeff: float,
         alpha: Union[float, torch.Tensor],
         value_coeff: float,
-        clamp: bool,
         reduction: str,
     ) -> None:
         super().__init__()
@@ -92,7 +90,6 @@ class A0CLoss(Loss):
         self.policy_coeff = policy_coeff
         self.alpha = alpha
         self.value_coeff = value_coeff
-        self.clamp = clamp
         self.reduction = reduction
 
     def _calculate_policy_loss(  # type: ignore[override]
@@ -104,12 +101,7 @@ class A0CLoss(Loss):
             log_diff = log_probs - self.tau * torch.log(counts)
 
         # multiply with log_probs gradient
-        if self.clamp:
-            policy_loss = torch.clamp(
-                torch.einsum("ni, ni -> n", log_diff, log_probs), min=0, max=1
-            )
-        else:
-            policy_loss = torch.einsum("ni, ni -> n", log_diff, log_probs)
+        policy_loss = torch.einsum("ni, ni -> n", log_diff, log_probs)
 
         if self.reduction == "mean":
             return policy_loss.mean()
@@ -153,7 +145,6 @@ class A0CLossTuned(A0CLoss):
     policy_coeff: float
     alpha: torch.Tensor
     value_coeff: float
-    clamp: bool
     reduction: str
     clip: float
     device: torch.device
@@ -168,7 +159,6 @@ class A0CLossTuned(A0CLoss):
         tau: float,
         policy_coeff: float,
         value_coeff: float,
-        clamp: bool,
         reduction: str,
         grad_clip: float,
         device: str,
@@ -196,7 +186,6 @@ class A0CLossTuned(A0CLoss):
             policy_coeff=policy_coeff,
             alpha=self.alpha,
             value_coeff=value_coeff,
-            clamp=clamp,
             reduction=reduction,
         )
 

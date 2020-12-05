@@ -4,5 +4,4 @@ tau: 0.1
 policy_coeff: 1
 alpha: 1
 value_coeff: 1
-clamp: false
 reduction: mean

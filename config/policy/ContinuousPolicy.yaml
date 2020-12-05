@@ -4,10 +4,10 @@ representation_dim: ??? # set later
 action_dim: ??? # set later
 action_bound: ??? # set later
 distribution: "normal" # normal or beta
-num_components: 1 # uses a GMM if num_components > 1
+num_components: 2 # uses a GMM if num_components > 1
 hidden_dimensions: [128, 128, 128]
 nonlinearity: "elu" # any of relu, leakyrelu, relu6, elu, silu/swish, hardswish
 layernorm: false
-log_prob_scale: 0.1
+log_prob_scale: 1
 log_param_min: -5
 log_param_max: 2

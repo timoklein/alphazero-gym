@@ -76,7 +76,7 @@ def run_continuous_agent(cfg: DictConfig):
         "Network nonlinearity": cfg.policy.nonlinearity,
         "LayerNorm": cfg.policy.layernorm,
         "Clamp log param": True,
-        "Clamp loss": "Log prob scaling",
+        "Clamp loss": "Loss scaling",
         "Log prob scale": cfg.policy.log_prob_scale,
         "Num mixture components": cfg.policy.num_components,
         "Distribution": distribution,
