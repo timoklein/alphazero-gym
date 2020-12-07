@@ -77,7 +77,7 @@ def run_continuous_agent(cfg: DictConfig):
         "LayerNorm": cfg.policy.layernorm,
         "Clamp log param": True,
         "Clamp loss": "Loss scaling",
-        "Log prob scale": cfg.policy.log_prob_scale,
+        "Log prob scale": "Corrected entropy",
         "Num mixture components": cfg.policy.num_components,
         "Distribution": distribution,
         "Optimizer": "Adam"

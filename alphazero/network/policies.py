@@ -63,7 +63,6 @@ class Policy(nn.Module):
     state_dim: int
     action_dim: int
     action_bound: Optional[float]
-    log_prob_scale: float
     log_param_min: float
     log_param_max: float
     hidden_layers: int
@@ -79,7 +78,6 @@ class Policy(nn.Module):
         hidden_dimensions: List[int],
         nonlinearity: str,
         layernorm: bool,
-        log_prob_scale: Optional[float],
         log_param_min: float,
         log_param_max: float,
     ):
@@ -89,7 +87,6 @@ class Policy(nn.Module):
         self.action_bound = action_bound
 
         # boundaries for the log standard deviation to increae training stability
-        self.log_prob_scale = 1 if log_prob_scale is None else log_prob_scale
         self.log_param_min = log_param_min
         self.log_param_max = log_param_max
 
@@ -400,7 +397,6 @@ class DiagonalNormalPolicy(Policy):
     state_dim: int
     action_dim: int
     action_bound: Optional[float]
-    log_prob_scale: Optional[float]
     log_param_min: float
     log_param_max: float
     hidden_layers: int
@@ -420,7 +416,6 @@ class DiagonalNormalPolicy(Policy):
         hidden_dimensions: List[int],
         nonlinearity: str,
         layernorm: bool,
-        log_prob_scale: Optional[float],
         log_param_min: float,
         log_param_max: float,
     ):
@@ -432,7 +427,6 @@ class DiagonalNormalPolicy(Policy):
             hidden_dimensions=hidden_dimensions,
             nonlinearity=nonlinearity,
             layernorm=layernorm,
-            log_prob_scale=log_prob_scale,
             log_param_min=log_param_min,
             log_param_max=log_param_max,
         )
@@ -486,7 +480,7 @@ class DiagonalNormalPolicy(Policy):
         else:
             normal = D.Normal(mu, sigma)
 
-        log_probs = self.log_prob_scale * normal.log_prob(actions)
+        log_probs = normal.log_prob(actions)
         entropy = -log_probs.mean(dim=-1)
 
         return log_probs, entropy, V_hat
@@ -550,7 +544,6 @@ class DiagonalGMMPolicy(Policy):
     state_dim: int
     action_dim: int
     action_bound: Optional[float]
-    log_prob_scale: Optional[float]
     log_param_min: float
     log_param_max: float
     hidden_layers: int
@@ -572,7 +565,6 @@ class DiagonalGMMPolicy(Policy):
         hidden_dimensions: List[int],
         nonlinearity: str,
         layernorm: bool,
-        log_prob_scale: Optional[float],
         log_param_min: float,
         log_param_max: float,
     ):
@@ -584,7 +576,6 @@ class DiagonalGMMPolicy(Policy):
             hidden_dimensions=hidden_dimensions,
             nonlinearity=nonlinearity,
             layernorm=layernorm,
-            log_prob_scale=log_prob_scale,
             log_param_min=log_param_min,
             log_param_max=log_param_max,
         )
@@ -657,7 +648,7 @@ class DiagonalGMMPolicy(Policy):
         else:
             component = D.Normal(mu, sigma)
         gmm = D.MixtureSameFamily(mix, component)
-        log_probs = self.log_prob_scale * gmm.log_prob(actions)
+        log_probs = gmm.log_prob(actions)
         entropy = -log_probs.mean(dim=-1)
 
         return log_probs, entropy, V_hat
@@ -718,7 +709,6 @@ class GeneralizedBetaPolicy(Policy):
     state_dim: int
     action_dim: int
     action_bound: float
-    log_prob_scale: Optional[float]
     log_param_min: float
     log_param_max: float
     hidden_layers: int
@@ -738,7 +728,6 @@ class GeneralizedBetaPolicy(Policy):
         hidden_dimensions: List[int],
         nonlinearity: str,
         layernorm: bool,
-        log_prob_scale: Optional[float],
         log_param_min: float,
         log_param_max: float,
     ):
@@ -752,7 +741,6 @@ class GeneralizedBetaPolicy(Policy):
             hidden_dimensions=hidden_dimensions,
             nonlinearity=nonlinearity,
             layernorm=layernorm,
-            log_prob_scale=log_prob_scale,
             log_param_min=log_param_min,
             log_param_max=log_param_max,
         )
@@ -825,7 +813,6 @@ def make_policy(
     num_actions: Optional[int] = None,
     action_bound: Optional[float] = None,
     layernorm: bool = False,
-    log_prob_scale: Optional[float] = None,
     log_param_min: float = -5,
     log_param_max: float = 2,
 ) -> Union[
@@ -877,7 +864,6 @@ def make_policy(
             hidden_dimensions=hidden_dimensions,
             nonlinearity=nonlinearity,
             layernorm=layernorm,
-            log_prob_scale=log_prob_scale,
             log_param_min=log_param_min,
             log_param_max=log_param_max,
         )
@@ -891,7 +877,6 @@ def make_policy(
                 hidden_dimensions=hidden_dimensions,
                 nonlinearity=nonlinearity,
                 layernorm=layernorm,
-                log_prob_scale=log_prob_scale,
                 log_param_min=log_param_min,
                 log_param_max=log_param_max,
             )
@@ -903,7 +888,6 @@ def make_policy(
                 hidden_dimensions=hidden_dimensions,
                 nonlinearity=nonlinearity,
                 layernorm=layernorm,
-                log_prob_scale=log_prob_scale,
                 log_param_min=log_param_min,
                 log_param_max=log_param_max,
             )

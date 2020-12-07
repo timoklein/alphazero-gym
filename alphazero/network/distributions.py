@@ -100,8 +100,11 @@ class ScaledTanhTransform(D.transforms.Transform):
         # Use more stable formula
         # The term D*log(bound) corrects for the rescaling after tanh
         # Degrades to the formula from the SAC paper if bound=1.0
+        # We also need to correct for the numerical stability correction in _inverse
+        # by rescaling the actions with
+        corr_stab = 1 + self.epsilon / self.bound
         return x.shape[-1] * math.log(self.bound) + 2.0 * (
-            math.log(2.0) - x - F.softplus(-2.0 * x)
+            math.log(2.0) - corr_stab * x - F.softplus(-2.0 * corr_stab * x)
         )
 
 
