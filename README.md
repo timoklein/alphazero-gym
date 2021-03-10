@@ -26,3 +26,4 @@ Base implementation.
 - [ ] RAD style data augmentations.  
 - [ ] Playout cap randomization.  
 - [ ] Test L2 reg (BatchNorm makes no sense for multimodal data).  
+- [ ] Subtract state dependent baseline in loss (mean/median of counts).
