@@ -96,6 +96,7 @@ class Agent(ABC):
                 loss = self.update(obs)
                 for key in loss.keys():
                     running_loss[key] += loss[key]
+        # FIXME: Doesn't change values in place
         for val in running_loss.values():
             val /= batches + 1
         return running_loss
