@@ -153,7 +153,8 @@ def run_continuous_agent(cfg: DictConfig):
             info_dict["alpha"] = agent.loss.alpha.detach().cpu().item()
 
         run.log(
-            info_dict, step=ep,
+            info_dict,
+            step=ep,
         )
 
         reward = np.round(R, 2)

@@ -13,7 +13,10 @@ class NonlinearityMapping(NamedTuple):
     hardswish: Callable[..., nn.Module] = nn.Hardswish
 
 
-def _map_call_dict(call_dict: NonlinearityMapping, element: Any,) -> Any:
+def _map_call_dict(
+    call_dict: NonlinearityMapping,
+    element: Any,
+) -> Any:
     if isinstance(element, str):
         element = _process_str(element)
         return getattr(call_dict, element)
@@ -24,24 +27,24 @@ def _map_call_dict(call_dict: NonlinearityMapping, element: Any,) -> Any:
 def _map_nonlinearities(
     element: Any, nonlinearity_mapping: Type[NonlinearityMapping] = NonlinearityMapping
 ) -> Any:
-    """Checks whether a string input specifies a PyTorch layer.  
-        
-        The method checks if the input is a string.  
-        If the input is a string, it is preprocessed and then mapped to
-        a corresponding PyTorch activation layer.  
-        If the input is not a string it is returned unchanged.  
+    """Checks whether a string input specifies a PyTorch layer.
 
-        Parameters  
-        ----------  
-        element : Any  
-            Arbitrary input to this function.  
-        
-        Returns  
-        -------  
-        Any  
-            Returns either a callable activation or normalization layer 
-            or the input element.   
-        """
+    The method checks if the input is a string.
+    If the input is a string, it is preprocessed and then mapped to
+    a corresponding PyTorch activation layer.
+    If the input is not a string it is returned unchanged.
+
+    Parameters
+    ----------
+    element : Any
+        Arbitrary input to this function.
+
+    Returns
+    -------
+    Any
+        Returns either a callable activation or normalization layer
+        or the input element.
+    """
 
     nonlinearities = nonlinearity_mapping()
 
@@ -49,16 +52,16 @@ def _map_nonlinearities(
 
 
 def _process_str(string: str) -> str:
-    """Lower case, strip trailing whitespace and replace _ in a string.  
-    
-    Parameters  
-    ----------  
-    string : str  
-        Input string.  
-    
-    Returns  
-    -------  
-    str  
-        Processed string.  
+    """Lower case, strip trailing whitespace and replace _ in a string.
+
+    Parameters
+    ----------
+    string : str
+        Input string.
+
+    Returns
+    -------
+    str
+        Processed string.
     """
     return string.lower().strip().replace("_", "")

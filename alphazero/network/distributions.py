@@ -8,19 +8,19 @@ __all__ = ["SquashedNormal", "GeneralizedBeta"]
 
 
 class ScaledTanhTransform(D.transforms.Transform):
-    """Scales a distribution between symmetric bounds.  
-    
+    """Scales a distribution between symmetric bounds.
+
      A more generalized version of the tanh squashing from the SAC paper.
-     Based on https://arxiv.org/pdf/1801.01290.pdf.  
+     Based on https://arxiv.org/pdf/1801.01290.pdf.
      First squashes the samples using tanh, then rescales to (-bound, +bound).
-    
-    Parameters  
-    ----------  
-    bound : float  
-        Scaling factor for the transformation. Applied after tanh squashing.  
-    cache_size : int  
-        Size of the cache. Can be either 0 or 1, default is 1.  
-        Caching may help when nan/inf values occur.  
+
+    Parameters
+    ----------
+    bound : float
+        Scaling factor for the transformation. Applied after tanh squashing.
+    cache_size : int
+        Size of the cache. Can be either 0 or 1, default is 1.
+        Caching may help when nan/inf values occur.
     """
 
     # member annotations
@@ -47,32 +47,32 @@ class ScaledTanhTransform(D.transforms.Transform):
         return f"Class={type(self).__name__}, Bounds={self.codomain}"
 
     def _call(self, x: torch.Tensor) -> torch.Tensor:
-        """Tanh squashing with subsequent rescaling.  
-        
-        Parameters  
-        ----------  
-        x : torch.FloatTensor  
-            Input Tensor. Only works for float types. 
-        
-        Returns  
-        -------  
-        torch.FloatTensor  
-            Tensor with the scaled tanh transformation applied.  
+        """Tanh squashing with subsequent rescaling.
+
+        Parameters
+        ----------
+        x : torch.FloatTensor
+            Input Tensor. Only works for float types.
+
+        Returns
+        -------
+        torch.FloatTensor
+            Tensor with the scaled tanh transformation applied.
         """
         return self.bound * x.tanh()
 
     def _inverse(self, y: torch.Tensor) -> torch.Tensor:
-        """Inverse of the scaled tanh squashing.   
-        
-        Parameters  
-        ----------  
-        y : torch.FloatTensor  
-            Input Tensor. Only works for float types. 
-        
-        Returns  
-        -------  
-        torch.FloatTensor  
-            Tensor with the inverse of the scaled tanh transformation applied.  
+        """Inverse of the scaled tanh squashing.
+
+        Parameters
+        ----------
+        y : torch.FloatTensor
+            Input Tensor. Only works for float types.
+
+        Returns
+        -------
+        torch.FloatTensor
+            Tensor with the inverse of the scaled tanh transformation applied.
         """
         # The epsilon parameter is needed to increase numerical stability
         # Without it, log_probs might result in NaN values if the samples
@@ -84,18 +84,18 @@ class ScaledTanhTransform(D.transforms.Transform):
         """Computes the log det jacobian `log |dy/dx|` given input and output.
 
         More information here https://arxiv.org/pdf/1801.01290.pdf.
-        
-        Parameters  
-        ----------  
-        x : torch.FloatTensor  
-            Input Tensor. Only works for float types. 
+
+        Parameters
+        ----------
+        x : torch.FloatTensor
+            Input Tensor. Only works for float types.
         y : torch.FloatTensor
-            Placeholder.  
-        
-        Returns  
-        -------  
-        torch.FloatTensor  
-            Computed result for the log determinant of the Jacobian.  
+            Placeholder.
+
+        Returns
+        -------
+        torch.FloatTensor
+            Computed result for the log determinant of the Jacobian.
         """
         # Use more stable formula
         # The term D*log(bound) corrects for the rescaling after tanh
@@ -109,21 +109,21 @@ class ScaledTanhTransform(D.transforms.Transform):
 
 
 class CenterScaleTransform(D.transforms.Transform):
-    """Centers a Beta distribution around 0 and then rescales it.    
-    
-    This transformation is taken from https://arxiv.org/pdf/1805.09613.pdf.  
+    """Centers a Beta distribution around 0 and then rescales it.
+
+    This transformation is taken from https://arxiv.org/pdf/1805.09613.pdf.
     Works for the beta distribution as it has a support on [0,1].
-    It first scales the samples by a factor of two, 
-    then subtracts 1 to center around 0. 
-    The transformed samples are then scaled to be in [-bound, bound].  
-    
-    Parameters  
-    ----------  
-    bound : float  
-        Scaling factor for the transformation. Applied after tanh squashing.  
-    cache_size : int  
-        Size of the cache. Can be either 0 or 1, default is 1.  
-        Caching may help when nan/inf values occur.  
+    It first scales the samples by a factor of two,
+    then subtracts 1 to center around 0.
+    The transformed samples are then scaled to be in [-bound, bound].
+
+    Parameters
+    ----------
+    bound : float
+        Scaling factor for the transformation. Applied after tanh squashing.
+    cache_size : int
+        Size of the cache. Can be either 0 or 1, default is 1.
+        Caching may help when nan/inf values occur.
     """
 
     # member annotations
@@ -150,32 +150,32 @@ class CenterScaleTransform(D.transforms.Transform):
         return f"Class={type(self).__name__}, Bounds={self.codomain}"
 
     def _call(self, x: torch.Tensor) -> torch.Tensor:
-        """Linear transformation to enfore action bounds.  
-        
-        Parameters  
-        ----------  
-        x : torch.FloatTensor  
-            Input Tensor. Only works for float types. 
-        
-        Returns  
-        -------  
-        torch.FloatTensor  
-            Tensor with the scaled tanh transformation applied.  
+        """Linear transformation to enfore action bounds.
+
+        Parameters
+        ----------
+        x : torch.FloatTensor
+            Input Tensor. Only works for float types.
+
+        Returns
+        -------
+        torch.FloatTensor
+            Tensor with the scaled tanh transformation applied.
         """
         return self.bound * (2 * x - 1)
 
     def _inverse(self, y: torch.Tensor) -> torch.Tensor:
-        """Inverse of the scaled tanh squashing.   
-        
-        Parameters  
-        ----------  
-        y : torch.FloatTensor  
-            Input Tensor. Only works for float types. 
-        
-        Returns  
-        -------  
-        torch.FloatTensor  
-            Tensor with the inverse of the scaled tanh transformation applied.  
+        """Inverse of the scaled tanh squashing.
+
+        Parameters
+        ----------
+        y : torch.FloatTensor
+            Input Tensor. Only works for float types.
+
+        Returns
+        -------
+        torch.FloatTensor
+            Tensor with the inverse of the scaled tanh transformation applied.
         """
         # Use the epsilon parameter in the denominator for numerical stability
         return y / (2 * self.bound + self.epsilon) + 0.5
@@ -184,39 +184,39 @@ class CenterScaleTransform(D.transforms.Transform):
         """Computes the log det jacobian `log |dy/dx|` given input and output.
 
         More information here https://arxiv.org/pdf/1805.09613.pdf.
-        
-        Parameters  
-        ----------  
-        x : torch.FloatTensor  
-            Input Tensor. Only works for float types. 
+
+        Parameters
+        ----------
+        x : torch.FloatTensor
+            Input Tensor. Only works for float types.
         y : torch.FloatTensor
-            Placeholder.  
-        
-        Returns  
-        -------  
-        torch.FloatTensor  
-            Computed result for the log determinant of the Jacobian.  
+            Placeholder.
+
+        Returns
+        -------
+        torch.FloatTensor
+            Computed result for the log determinant of the Jacobian.
         """
         return torch.tensor([x.shape[-1] * (math.log(2) + math.log(self.bound))])
 
 
 class SquashedNormal(D.transformed_distribution.TransformedDistribution):
-    """Squashed and rescaled Normal distribution.  
-    
-    Squashing and rescaling consists of applying c*tanh(x) to the samples x.  
-    This is a more general version of the squashed normal distribution from the SAC paper.  
+    """Squashed and rescaled Normal distribution.
+
+    Squashing and rescaling consists of applying c*tanh(x) to the samples x.
+    This is a more general version of the squashed normal distribution from the SAC paper.
     The original (-1,1) scaling can be recovered by setting bounds=1, although the
-    generalized implementation is slightly less efficient in this case.  
-    
-    Parameters  
-    ----------  
-    loc : torch.Tensor  
-        Location parameters of the distribution. 
-        The loc parameter does not correspond to the mean because it is untransformed.    
-    scale : torch.Tensor  
-        Scale parameters of the distribution. 
+    generalized implementation is slightly less efficient in this case.
+
+    Parameters
+    ----------
+    loc : torch.Tensor
+        Location parameters of the distribution.
+        The loc parameter does not correspond to the mean because it is untransformed.
+    scale : torch.Tensor
+        Scale parameters of the distribution.
     bounds : float
-        Scaling factor after applying tanh. Results in samples scaled to (-bounds, bounds).  
+        Scaling factor after applying tanh. Results in samples scaled to (-bounds, bounds).
     """
 
     # member annotations
@@ -248,46 +248,46 @@ class SquashedNormal(D.transformed_distribution.TransformedDistribution):
 
     @property
     def mean(self) -> torch.FloatTensor:
-        """Determine the transformed mean of the distribution.  
-        
-        Returns  
-        -------  
-        torch.FloatTensor  
-            Transformed location parameter of the distribution.  
+        """Determine the transformed mean of the distribution.
+
+        Returns
+        -------
+        torch.FloatTensor
+            Transformed location parameter of the distribution.
         """
         mu = self.loc
         return self.transforms[0](mu)
 
     @property
     def range(self) -> D.constraints._Interval:
-        """Return the support of the distribution as torch Interval.  
-        
-        Will be (-c, c) since scaled tanh squashing is applied.  
-        Here c are the bounds for the action space.  
-        
-        Returns  
-        -------  
-        D.constraints._Interval  
-            Interval on which the distribution is defined.  
+        """Return the support of the distribution as torch Interval.
+
+        Will be (-c, c) since scaled tanh squashing is applied.
+        Here c are the bounds for the action space.
+
+        Returns
+        -------
+        D.constraints._Interval
+            Interval on which the distribution is defined.
         """
         return self.transforms[0].codomain
 
 
 class GeneralizedBeta(D.transformed_distribution.TransformedDistribution):
-    """Centered and rescaled Beta distribution.  
-    
-    Centering around 0 is done by x=2*u -1.  
-    Then the sample x is rescaled to be between (-bounds, bounds) with bounds*x.  
-    Taken from https://arxiv.org/pdf/1805.09613.pdf.  
-    
-    Parameters  
-    ----------  
-    concentration1 : torch.Tensor  
-        First parameter of the beta distribution. Referred to as alpha.   
-    concentration0 : torch.Tensor  
-        Second parameter of the beta distribution. Referred to as beta.  
+    """Centered and rescaled Beta distribution.
+
+    Centering around 0 is done by x=2*u -1.
+    Then the sample x is rescaled to be between (-bounds, bounds) with bounds*x.
+    Taken from https://arxiv.org/pdf/1805.09613.pdf.
+
+    Parameters
+    ----------
+    concentration1 : torch.Tensor
+        First parameter of the beta distribution. Referred to as alpha.
+    concentration0 : torch.Tensor
+        Second parameter of the beta distribution. Referred to as beta.
     bounds : float
-        Scaling factor after applying tanh. Results in samples scaled to (-bounds, bounds).  
+        Scaling factor after applying tanh. Results in samples scaled to (-bounds, bounds).
     """
 
     # member annotations
@@ -319,27 +319,27 @@ class GeneralizedBeta(D.transformed_distribution.TransformedDistribution):
 
     @property
     def mean(self) -> torch.FloatTensor:
-        """Determine the transformed mean of the distribution.  
-        
-        Returns  
-        -------  
-        torch.FloatTensor  
-            Transformed mean of the distribution.  
+        """Determine the transformed mean of the distribution.
+
+        Returns
+        -------
+        torch.FloatTensor
+            Transformed mean of the distribution.
         """
         mean = self.concentration1 / (self.concentration1 + self.concentration0)
         return self.transforms[0](mean)
 
     @property
     def range(self) -> D.constraints._Interval:
-        """Return the support of the distribution as torch Interval.  
-        
-        Will be (-c, c) since scaled tanh squashing is applied.  
-        Here c are the bounds for the action space.  
-        
-        Returns  
-        -------  
-        D.constraints._Interval  
-            Interval on which the distribution is defined.  
+        """Return the support of the distribution as torch Interval.
+
+        Will be (-c, c) since scaled tanh squashing is applied.
+        Here c are the bounds for the action space.
+
+        Returns
+        -------
+        D.constraints._Interval
+            Interval on which the distribution is defined.
         """
         return self.transforms[0].codomain
 

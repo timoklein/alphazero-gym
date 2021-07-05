@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 
 class Node(ABC):
 
-    state: np.array
+    state: np.ndarray
     r: float
     terminal: bool
     parent_action: Action
@@ -37,7 +37,7 @@ class Node(ABC):
 
 class Action(ABC):
 
-    action: np.array
+    action: np.ndarray
     parent_node: Node
     W: float
     n: int
@@ -47,7 +47,7 @@ class Action(ABC):
     __slots__ = ("action", "parent_node", "W", "n", "Q", "child_node")
 
     @abstractmethod
-    def add_child_node(self, state: np.array, r: float, terminal: bool) -> Node:
+    def add_child_node(self, state: np.ndarray, r: float, terminal: bool) -> Node:
         ...
 
     @property
@@ -63,21 +63,21 @@ class Action(ABC):
 class NodeDiscrete(Node):
     """ Node object """
 
-    state: np.array
+    state: np.ndarray
     r: float
     terminal: bool
     parent_action: ActionDiscrete
     n: int
     V: Optional[float]
     child_actions: Optional[List[ActionDiscrete]]  # type: ignore[assignment]
-    priors: np.array
+    priors: np.ndarray
     num_actions: int
 
     __slots__ = "priors", "num_actions"
 
     def __init__(
         self,
-        state: np.array,
+        state: np.ndarray,
         r: float,
         terminal: bool,
         parent_action: ActionDiscrete,
@@ -108,7 +108,7 @@ class NodeDiscrete(Node):
 class NodeContinuous(Node):
     """ Node object """
 
-    state: np.array
+    state: np.ndarray
     r: float
     terminal: bool
     parent_action: ActionContinuous
@@ -118,7 +118,7 @@ class NodeContinuous(Node):
 
     def __init__(
         self,
-        state: np.array,
+        state: np.ndarray,
         r: float,
         terminal: bool,
         parent_action: ActionContinuous,
@@ -157,7 +157,7 @@ class NodeContinuous(Node):
 class ActionDiscrete(Action):
     """ Action object """
 
-    action: np.array
+    action: np.ndarray
     parent_node: NodeDiscrete
     W: float
     n: int
@@ -173,7 +173,9 @@ class ActionDiscrete(Action):
 
         self.child_node = None
 
-    def add_child_node(self, state: np.array, r: float, terminal: bool) -> NodeDiscrete:
+    def add_child_node(
+        self, state: np.ndarray, r: float, terminal: bool
+    ) -> NodeDiscrete:
         self.child_node = NodeDiscrete(
             state, r, terminal, self, self.parent_node.num_actions
         )
@@ -188,14 +190,14 @@ class ActionDiscrete(Action):
 class ActionContinuous(Action):
     """ Action object """
 
-    action: np.array
+    action: np.ndarray
     paren_node: NodeContinuous
     W: float
     n: int
     Q: float
     child_node: Optional[NodeContinuous]
 
-    def __init__(self, action: np.array, parent_node: NodeContinuous, Q_init: float):
+    def __init__(self, action: np.ndarray, parent_node: NodeContinuous, Q_init: float):
         self.action = action
         self.parent_node = parent_node
         self.Q = Q_init
@@ -205,7 +207,7 @@ class ActionContinuous(Action):
         self.child_node = None
 
     def add_child_node(
-        self, state: np.array, r: float, terminal: bool
+        self, state: np.ndarray, r: float, terminal: bool
     ) -> NodeContinuous:
         self.child_node = NodeContinuous(state, r, terminal, self)
         return self.child_node

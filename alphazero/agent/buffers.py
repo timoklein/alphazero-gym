@@ -9,11 +9,11 @@ class ReplayBuffer:
 
     max_size: int
     batch_size: int
-    sample_array: np.array
+    sample_array: np.ndarray
     sample_index: int
     insert_index: int
     size: int
-    experience: List[Tuple[np.array, np.array, np.array, np.array, np.array]]
+    experience: List[Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]]
 
     def __init__(self, max_size: int, batch_size: int) -> None:
         self.max_size = max_size
@@ -28,7 +28,8 @@ class ReplayBuffer:
         self.size = 0
 
     def store(
-        self, experience: Tuple[np.array, np.array, np.array, np.array, np.array]
+        self,
+        experience: Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray],
     ) -> None:
         if self.size < self.max_size:
             self.experience.append(experience)
@@ -50,7 +51,9 @@ class ReplayBuffer:
     def __len__(self) -> int:
         return len(self.experience)
 
-    def __next__(self) -> Tuple[np.array, np.array, np.array, np.array, np.array]:
+    def __next__(
+        self,
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         if (self.sample_index + self.batch_size > self.size) and (
             not self.sample_index == 0
         ):

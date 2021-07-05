@@ -20,43 +20,43 @@ __all__ = [
 
 # TODO: Make this an ABC
 class Policy(nn.Module):
-    """Base policy class.  
-    
-    The base policy is responsible for instanting the linear layers and value head.  
-    It also defines some interface functions.   
-    
-    Parameters  
-    ----------  
+    """Base policy class.
+
+    The base policy is responsible for instanting the linear layers and value head.
+    It also defines some interface functions.
+
+    Parameters
+    ----------
     representation_dim : int
-        Dimensions of the input representation.  
+        Dimensions of the input representation.
     action_dim : int
-        Number of dimensions for the action space.  
-    distribution : str  
-        Distribution that is parameterized by the network. 
+        Number of dimensions for the action space.
+    distribution : str
+        Distribution that is parameterized by the network.
         Allows the following options:
-            - "normal": Normal distribution.  
-            - "tanhsquashed", "tanhsquashednormal": Normal distribution with samples squashed in (-1, 1).  
-            - "generalizedsquashed", "generalizedsquashednormal": Normal distribution with samples squashed in (-c, c). 
-            - "beta", "generalizedbeta": Beta distribution with transformed support on (-c, c).   
+            - "normal": Normal distribution.
+            - "tanhsquashed", "tanhsquashednormal": Normal distribution with samples squashed in (-1, 1).
+            - "generalizedsquashed", "generalizedsquashednormal": Normal distribution with samples squashed in (-c, c).
+            - "beta", "generalizedbeta": Beta distribution with transformed support on (-c, c).
     action_bound : Optional[float]
-        Bounds for the action space. Can be either float or None.  
+        Bounds for the action space. Can be either float or None.
     hidden_dimensions : List[int]
-        Specify the number of hidden neurons for each respective hidden layer of the network. Cannot be empty. 
-    nonlinearity : str  
-        Nonlinearity used between hidden layers. Options are:  
+        Specify the number of hidden neurons for each respective hidden layer of the network. Cannot be empty.
+    nonlinearity : str
+        Nonlinearity used between hidden layers. Options are:
             - "relu": https://pytorch.org/docs/stable/generated/torch.nn.ReLU.html#torch.nn.ReLU  .
-            - "leakyrelu": https://pytorch.org/docs/stable/generated/torch.nn.LeakyReLU.html#torch.nn.LeakyReLU.  
-            - "relu6": https://pytorch.org/docs/stable/generated/torch.nn.ReLU6.html#torch.nn.ReLU6.  
-            - "silu": https://pytorch.org/docs/stable/generated/torch.nn.SiLU.html#torch.nn.SiLU.  
-            - "elu": https://pytorch.org/docs/stable/generated/torch.nn.ELU.html#torch.nn.ELU.  
-            - "hardswish": https://pytorch.org/docs/stable/generated/torch.nn.Hardswish.html#torch.nn.Hardswish.   
+            - "leakyrelu": https://pytorch.org/docs/stable/generated/torch.nn.LeakyReLU.html#torch.nn.LeakyReLU.
+            - "relu6": https://pytorch.org/docs/stable/generated/torch.nn.ReLU6.html#torch.nn.ReLU6.
+            - "silu": https://pytorch.org/docs/stable/generated/torch.nn.SiLU.html#torch.nn.SiLU.
+            - "elu": https://pytorch.org/docs/stable/generated/torch.nn.ELU.html#torch.nn.ELU.
+            - "hardswish": https://pytorch.org/docs/stable/generated/torch.nn.Hardswish.html#torch.nn.Hardswish.
     layernorm : bool
-        If True, the network is regularized with layer normalization after each liner layer.  
-        This may increase performance, see https://arxiv.org/pdf/1709.06560.pdf for info.  
+        If True, the network is regularized with layer normalization after each liner layer.
+        This may increase performance, see https://arxiv.org/pdf/1709.06560.pdf for info.
     log_param_min : int
-        Lower bound for learned log parameters.  
+        Lower bound for learned log parameters.
     log_param_max : int
-        Upper bound for learned log parameters.  
+        Upper bound for learned log parameters.
     """
 
     # member type annotations
@@ -120,11 +120,11 @@ class Policy(nn.Module):
         self.value_head = nn.Linear(hidden_dimensions[-1], 1)
 
     def __repr__(self) -> str:
-        """ 
-        Returns  
-        -------  
-        str  
-            String representation of this instance.   
+        """
+        Returns
+        -------
+        str
+            String representation of this instance.
         """
         components: int = getattr(self, "num_components", 1)
         return (
@@ -135,11 +135,11 @@ class Policy(nn.Module):
         )
 
     @property
-    def bounds(self) -> np.array:
+    def bounds(self) -> np.ndarray:
         if self.action_bound is None:
-            return np.array([-np.inf, np.inf], dtype=np.float32)
+            return np.ndarray([-np.inf, np.inf], dtype=np.float32)
         else:
-            return np.array([-self.action_bound, self.action_bound], dtype=np.float32)
+            return np.ndarray([-self.action_bound, self.action_bound], dtype=np.float32)
 
     @torch.no_grad()
     def get_train_data(
@@ -148,11 +148,11 @@ class Policy(nn.Module):
         raise NotImplementedError
 
     @torch.no_grad()
-    def sample_action(self, x: torch.Tensor) -> np.array:
+    def sample_action(self, x: torch.Tensor) -> np.ndarray:
         raise NotImplementedError
 
     @torch.no_grad()
-    def predict_V(self, x: torch.Tensor) -> np.array:
+    def predict_V(self, x: torch.Tensor) -> np.ndarray:
         self.eval()
         x = self.trunk(x)
         V_hat = self.value_head(x)
@@ -161,43 +161,43 @@ class Policy(nn.Module):
 
 
 class DiscretePolicy(nn.Module):
-    """Base policy class.  
-    
-    The base policy is responsible for instanting the linear layers and value head.  
-    It also defines some interface functions.   
-    
-    Parameters  
-    ----------  
+    """Base policy class.
+
+    The base policy is responsible for instanting the linear layers and value head.
+    It also defines some interface functions.
+
+    Parameters
+    ----------
     representation_dim : int
-        Dimensions of the input representation.  
+        Dimensions of the input representation.
     action_dim : int
-        Number of dimensions for the action space.  
-    distribution : str  
-        Distribution that is parameterized by the network. 
+        Number of dimensions for the action space.
+    distribution : str
+        Distribution that is parameterized by the network.
         Allows the following options:
-            - "normal": Normal distribution.  
-            - "tanhsquashed", "tanhsquashednormal": Normal distribution with samples squashed in (-1, 1).  
-            - "generalizedsquashed", "generalizedsquashednormal": Normal distribution with samples squashed in (-c, c). 
-            - "beta", "generalizedbeta": Beta distribution with transformed support on (-c, c).   
+            - "normal": Normal distribution.
+            - "tanhsquashed", "tanhsquashednormal": Normal distribution with samples squashed in (-1, 1).
+            - "generalizedsquashed", "generalizedsquashednormal": Normal distribution with samples squashed in (-c, c).
+            - "beta", "generalizedbeta": Beta distribution with transformed support on (-c, c).
     action_bound : Optional[float]
-        Bounds for the action space. Can be either float or None.  
+        Bounds for the action space. Can be either float or None.
     hidden_dimensions : List[int]
-        Specify the number of hidden neurons for each respective hidden layer of the network. Cannot be empty. 
-    nonlinearity : str  
-        Nonlinearity used between hidden layers. Options are:  
+        Specify the number of hidden neurons for each respective hidden layer of the network. Cannot be empty.
+    nonlinearity : str
+        Nonlinearity used between hidden layers. Options are:
             - "relu": https://pytorch.org/docs/stable/generated/torch.nn.ReLU.html#torch.nn.ReLU  .
-            - "leakyrelu": https://pytorch.org/docs/stable/generated/torch.nn.LeakyReLU.html#torch.nn.LeakyReLU.  
-            - "relu6": https://pytorch.org/docs/stable/generated/torch.nn.ReLU6.html#torch.nn.ReLU6.  
-            - "silu": https://pytorch.org/docs/stable/generated/torch.nn.SiLU.html#torch.nn.SiLU.  
-            - "elu": https://pytorch.org/docs/stable/generated/torch.nn.ELU.html#torch.nn.ELU.  
-            - "hardswish": https://pytorch.org/docs/stable/generated/torch.nn.Hardswish.html#torch.nn.Hardswish.   
+            - "leakyrelu": https://pytorch.org/docs/stable/generated/torch.nn.LeakyReLU.html#torch.nn.LeakyReLU.
+            - "relu6": https://pytorch.org/docs/stable/generated/torch.nn.ReLU6.html#torch.nn.ReLU6.
+            - "silu": https://pytorch.org/docs/stable/generated/torch.nn.SiLU.html#torch.nn.SiLU.
+            - "elu": https://pytorch.org/docs/stable/generated/torch.nn.ELU.html#torch.nn.ELU.
+            - "hardswish": https://pytorch.org/docs/stable/generated/torch.nn.Hardswish.html#torch.nn.Hardswish.
     layernorm : bool
-        If True, the network is regularized with layer normalization after each liner layer.  
-        This may increase performance, see https://arxiv.org/pdf/1709.06560.pdf for info.  
+        If True, the network is regularized with layer normalization after each liner layer.
+        This may increase performance, see https://arxiv.org/pdf/1709.06560.pdf for info.
     log_param_min : int
-        Lower bound for learned log parameters.  
+        Lower bound for learned log parameters.
     log_param_max : int
-        Upper bound for learned log parameters.  
+        Upper bound for learned log parameters.
     """
 
     # member type annotations
@@ -259,11 +259,11 @@ class DiscretePolicy(nn.Module):
         self.dist_head = nn.Linear(hidden_dimensions[-1], num_actions)
 
     def __repr__(self) -> str:
-        """ 
-        Returns  
-        -------  
-        str  
-            String representation of this instance.   
+        """
+        Returns
+        -------
+        str
+            String representation of this instance.
         """
         return (
             f"class={type(self).__name__}, distribution={self.distribution_type}, num_actions={self.num_actions}, "
@@ -275,17 +275,17 @@ class DiscretePolicy(nn.Module):
     def _get_dist_params(
         self, x: torch.Tensor
     ) -> Tuple[torch.FloatTensor, torch.FloatTensor]:
-        """Returns the learned paremters of the distribution.    
-        
-        Parameters  
-        ----------  
-        x : torch.FloatTensor  
-            Input state tensor.    
-        
-        Returns  
-        -------  
-        Tuple[torch.FloatTensor, torch.FloatTensor, torch.FloatTensor]  
-            Distribution mean (mu), Distribution standard deviation (sigma), State value estimate (V_hat).  
+        """Returns the learned paremters of the distribution.
+
+        Parameters
+        ----------
+        x : torch.FloatTensor
+            Input state tensor.
+
+        Returns
+        -------
+        Tuple[torch.FloatTensor, torch.FloatTensor, torch.FloatTensor]
+            Distribution mean (mu), Distribution standard deviation (sigma), State value estimate (V_hat).
         """
         x = self.trunk(x)
         V_hat = self.value_head(x)
@@ -297,17 +297,17 @@ class DiscretePolicy(nn.Module):
         return pi_logits, V_hat
 
     def forward(self, x: torch.FloatTensor) -> Tuple[D.Categorical, torch.FloatTensor]:
-        """Forward pass of the model.    
-        
-        Parameters  
-        ----------  
-        x : torch.FloatTensor  
-            Input state tensor.    
-        
-        Returns  
-        -------  
-        Tuple[Normallike, torch.FloatTensor]  
-            Normal or squashed Normal distribution (dist), State value estimate (V_hat).  
+        """Forward pass of the model.
+
+        Parameters
+        ----------
+        x : torch.FloatTensor
+            Input state tensor.
+
+        Returns
+        -------
+        Tuple[Normallike, torch.FloatTensor]
+            Normal or squashed Normal distribution (dist), State value estimate (V_hat).
         """
         pi_logits, V_hat = self._get_dist_params(x)
 
@@ -338,14 +338,14 @@ class DiscretePolicy(nn.Module):
         return log_probs, entropy, V_hat
 
     @torch.no_grad()
-    def predict_V(self, x: torch.Tensor) -> np.array:
+    def predict_V(self, x: torch.Tensor) -> np.ndarray:
         self.eval()
         _, V_hat = self(x)
         self.train()
         return V_hat.detach().cpu().numpy()
 
     @torch.no_grad()
-    def predict_pi(self, x: torch.Tensor) -> np.array:
+    def predict_pi(self, x: torch.Tensor) -> np.ndarray:
         self.eval()
         logits, _ = self._get_dist_params(x)
         self.train()
@@ -353,44 +353,44 @@ class DiscretePolicy(nn.Module):
 
 
 class DiagonalNormalPolicy(Policy):
-    """Policy class for factorized normal distributions.  
-    
+    """Policy class for factorized normal distributions.
+
     Learns parameters for a factorized normal distribution of types
     Normal, TanhSquashedNormal or GeneralizedSquashedNormal.
     Factorized means that a conditionally independent (given a state) 1D Normal distribution is
-    learned for each dimension of the action space instead of a Multivariate Normal.   
-    
-    Parameters  
-    ----------  
+    learned for each dimension of the action space instead of a Multivariate Normal.
+
+    Parameters
+    ----------
     representation_dim : int
-        Dimensions of the input representation.  
+        Dimensions of the input representation.
     action_dim : int
-        Number of dimensions for the action space.  
-    distribution : str  
-        Distribution that is parameterized by the network. Has to be a Normallike  distribution.  
+        Number of dimensions for the action space.
+    distribution : str
+        Distribution that is parameterized by the network. Has to be a Normallike  distribution.
         Allows the following options:
-            - "normal": Normal distribution.  
-            - "tanhsquashed", "tanhsquashednormal": Normal distribution with samples squashed in (-1, 1).  
-            - "generalizedsquashed", "generalizedsquashednormal": Normal distribution with samples squashed in (-c, c). 
+            - "normal": Normal distribution.
+            - "tanhsquashed", "tanhsquashednormal": Normal distribution with samples squashed in (-1, 1).
+            - "generalizedsquashed", "generalizedsquashednormal": Normal distribution with samples squashed in (-c, c).
     action_bound : Optional[float]
-        Bounds for the action space. Can be either float or None.  
+        Bounds for the action space. Can be either float or None.
     hidden_dimensions : List[int]
-        Specify the number of hidden neurons for each respective hidden layer of the network. Cannot be empty. 
-    nonlinearity : str  
-        Nonlinearity used between hidden layers. Options are:  
+        Specify the number of hidden neurons for each respective hidden layer of the network. Cannot be empty.
+    nonlinearity : str
+        Nonlinearity used between hidden layers. Options are:
             - "relu": https://pytorch.org/docs/stable/generated/torch.nn.ReLU.html#torch.nn.ReLU  .
-            - "leakyrelu": https://pytorch.org/docs/stable/generated/torch.nn.LeakyReLU.html#torch.nn.LeakyReLU.  
-            - "relu6": https://pytorch.org/docs/stable/generated/torch.nn.ReLU6.html#torch.nn.ReLU6.  
-            - "silu": https://pytorch.org/docs/stable/generated/torch.nn.SiLU.html#torch.nn.SiLU.  
-            - "elu": https://pytorch.org/docs/stable/generated/torch.nn.ELU.html#torch.nn.ELU.  
-            - "hardswish": https://pytorch.org/docs/stable/generated/torch.nn.Hardswish.html#torch.nn.Hardswish.   
+            - "leakyrelu": https://pytorch.org/docs/stable/generated/torch.nn.LeakyReLU.html#torch.nn.LeakyReLU.
+            - "relu6": https://pytorch.org/docs/stable/generated/torch.nn.ReLU6.html#torch.nn.ReLU6.
+            - "silu": https://pytorch.org/docs/stable/generated/torch.nn.SiLU.html#torch.nn.SiLU.
+            - "elu": https://pytorch.org/docs/stable/generated/torch.nn.ELU.html#torch.nn.ELU.
+            - "hardswish": https://pytorch.org/docs/stable/generated/torch.nn.Hardswish.html#torch.nn.Hardswish.
     layernorm : bool
-        If True, the network is regularized with layer normalization after each liner layer.  
-        This may increase performance, see https://arxiv.org/pdf/1709.06560.pdf for info.  
+        If True, the network is regularized with layer normalization after each liner layer.
+        This may increase performance, see https://arxiv.org/pdf/1709.06560.pdf for info.
     log_param_min : int
-        Lower bound for learned log standard deviation.  
+        Lower bound for learned log standard deviation.
     log_param_max : int
-        Upper bound for learned log standard deviation.  
+        Upper bound for learned log standard deviation.
     """
 
     # member annotations
@@ -436,17 +436,17 @@ class DiagonalNormalPolicy(Policy):
     def forward(
         self, x: torch.FloatTensor
     ) -> Tuple[torch.FloatTensor, torch.FloatTensor, torch.FloatTensor]:
-        """Returns the learned paremters of the distribution.    
-        
-        Parameters  
-        ----------  
-        x : torch.FloatTensor  
-            Input state tensor.    
-        
-        Returns  
-        -------  
-        Tuple[torch.FloatTensor, torch.FloatTensor, torch.FloatTensor]  
-            Distribution mean (mu), Distribution standard deviation (sigma), State value estimate (V_hat).  
+        """Returns the learned paremters of the distribution.
+
+        Parameters
+        ----------
+        x : torch.FloatTensor
+            Input state tensor.
+
+        Returns
+        -------
+        Tuple[torch.FloatTensor, torch.FloatTensor, torch.FloatTensor]
+            Distribution mean (mu), Distribution standard deviation (sigma), State value estimate (V_hat).
         """
         x = self.trunk(x)
         V_hat = self.value_head(x)
@@ -486,7 +486,7 @@ class DiagonalNormalPolicy(Policy):
         return log_probs, entropy, V_hat
 
     @torch.no_grad()
-    def sample_action(self, x: torch.Tensor) -> np.array:
+    def sample_action(self, x: torch.Tensor) -> np.ndarray:
         self.eval()
         mu, sigma, _ = self(x)
         normal: Union[D.Normal, SquashedNormal]
@@ -500,44 +500,44 @@ class DiagonalNormalPolicy(Policy):
 
 
 class DiagonalGMMPolicy(Policy):
-    """Policy class for learning a factorized GMM.  
-    
-    Learns a 1D GMM for each dimension of the action space.  
-    The components of the GMM are either Normal or squashed Normal.   
-    
-    Parameters  
-    ----------  
+    """Policy class for learning a factorized GMM.
+
+    Learns a 1D GMM for each dimension of the action space.
+    The components of the GMM are either Normal or squashed Normal.
+
+    Parameters
+    ----------
     representation_dim : int
-        Dimensions of the input representation.  
+        Dimensions of the input representation.
     action_dim : int
-        Number of dimensions for the action space.  
-    distribution : str  
-        Distribution that is parameterized by the network. Has to be Normallike.  
+        Number of dimensions for the action space.
+    distribution : str
+        Distribution that is parameterized by the network. Has to be Normallike.
         Allows the following options:
-            - "normal": Normal distribution.  
-            - "tanhsquashed", "tanhsquashednormal": Normal distribution with samples squashed in (-1, 1).  
-            - "generalizedsquashed", "generalizedsquashednormal": Normal distribution with samples squashed in (-c, c). 
-    num_components : int 
-        Number of mixture components.  
+            - "normal": Normal distribution.
+            - "tanhsquashed", "tanhsquashednormal": Normal distribution with samples squashed in (-1, 1).
+            - "generalizedsquashed", "generalizedsquashednormal": Normal distribution with samples squashed in (-c, c).
+    num_components : int
+        Number of mixture components.
     action_bound : Optional[float]
-        Bounds for the action space. Can be either float or None.  
+        Bounds for the action space. Can be either float or None.
     hidden_dimensions : List[int]
-        Specify the number of hidden neurons for each respective hidden layer of the network. Cannot be empty. 
-    nonlinearity : str  
-        Nonlinearity used between hidden layers. Options are:  
+        Specify the number of hidden neurons for each respective hidden layer of the network. Cannot be empty.
+    nonlinearity : str
+        Nonlinearity used between hidden layers. Options are:
             - "relu": https://pytorch.org/docs/stable/generated/torch.nn.ReLU.html#torch.nn.ReLU  .
-            - "leakyrelu": https://pytorch.org/docs/stable/generated/torch.nn.LeakyReLU.html#torch.nn.LeakyReLU.  
-            - "relu6": https://pytorch.org/docs/stable/generated/torch.nn.ReLU6.html#torch.nn.ReLU6.  
-            - "silu": https://pytorch.org/docs/stable/generated/torch.nn.SiLU.html#torch.nn.SiLU.  
-            - "elu": https://pytorch.org/docs/stable/generated/torch.nn.ELU.html#torch.nn.ELU.  
-            - "hardswish": https://pytorch.org/docs/stable/generated/torch.nn.Hardswish.html#torch.nn.Hardswish.   
+            - "leakyrelu": https://pytorch.org/docs/stable/generated/torch.nn.LeakyReLU.html#torch.nn.LeakyReLU.
+            - "relu6": https://pytorch.org/docs/stable/generated/torch.nn.ReLU6.html#torch.nn.ReLU6.
+            - "silu": https://pytorch.org/docs/stable/generated/torch.nn.SiLU.html#torch.nn.SiLU.
+            - "elu": https://pytorch.org/docs/stable/generated/torch.nn.ELU.html#torch.nn.ELU.
+            - "hardswish": https://pytorch.org/docs/stable/generated/torch.nn.Hardswish.html#torch.nn.Hardswish.
     layernorm : bool
-        If True, the network is regularized with layer normalization after each liner layer.  
-        This may increase performance, see https://arxiv.org/pdf/1709.06560.pdf for info.  
+        If True, the network is regularized with layer normalization after each liner layer.
+        This may increase performance, see https://arxiv.org/pdf/1709.06560.pdf for info.
     log_param_min : int
-        Lower bound for learned log standard deviations.  
+        Lower bound for learned log standard deviations.
     log_param_max : int
-        Upper bound for learned log standard deviations.  
+        Upper bound for learned log standard deviations.
     """
 
     # member annotations
@@ -592,19 +592,19 @@ class DiagonalGMMPolicy(Policy):
     ) -> Tuple[
         torch.FloatTensor, torch.FloatTensor, torch.FloatTensor, torch.FloatTensor
     ]:
-        """Returns the learned paremters of the distribution.    
-        
-        Parameters  
-        ----------  
-        x : torch.FloatTensor  
-            Input state tensor.    
-        
-        Returns  
-        -------  
-        Tuple[torch.FloatTensor, torch.FloatTensor, torch.FloatTensor, torch.FloatTensor]  
-            Distribution mean (mu), Distribution standard deviation (sigma), 
+        """Returns the learned paremters of the distribution.
+
+        Parameters
+        ----------
+        x : torch.FloatTensor
+            Input state tensor.
+
+        Returns
+        -------
+        Tuple[torch.FloatTensor, torch.FloatTensor, torch.FloatTensor, torch.FloatTensor]
+            Distribution mean (mu), Distribution standard deviation (sigma),
             Logits for the categorical distribution parameterizing the components (log_coeffs),
-            State value estimate (V_hat).  
+            State value estimate (V_hat).
         """
         x = self.trunk(x)
         V_hat = self.value_head(x)
@@ -654,7 +654,7 @@ class DiagonalGMMPolicy(Policy):
         return log_probs, entropy, V_hat
 
     @torch.no_grad()
-    def sample_action(self, x: torch.Tensor) -> np.array:
+    def sample_action(self, x: torch.Tensor) -> np.ndarray:
         self.eval()
         mu, sigma, log_coeff, _ = self(x)
         mix = D.Categorical(logits=log_coeff)
@@ -670,39 +670,39 @@ class DiagonalGMMPolicy(Policy):
 
 
 class GeneralizedBetaPolicy(Policy):
-    """Policy class for a generalized Beta distribution.  
-    
-    The beta distribution used by this class is generalized in that it has support 
-    [-c, c] instead of [0,1]. 
-    This is achieved via a location-scale transformation (2c)x - c, where c are the desired bounds.  
-    Since both parameters alpha, beta > 0, the log-learning-trick for the Normal standard deviation 
+    """Policy class for a generalized Beta distribution.
+
+    The beta distribution used by this class is generalized in that it has support
+    [-c, c] instead of [0,1].
+    This is achieved via a location-scale transformation (2c)x - c, where c are the desired bounds.
+    Since both parameters alpha, beta > 0, the log-learning-trick for the Normal standard deviation
     is applied to both parameters.
-    
-    Parameters  
-    ----------  
+
+    Parameters
+    ----------
     representation_dim : int
-        Dimensions of the input representation.  
+        Dimensions of the input representation.
     action_dim : int
-        Number of dimensions for the action space.  
+        Number of dimensions for the action space.
     action_bound : Optional[float]
-        Bounds for the action space. Can be either float or None.  
+        Bounds for the action space. Can be either float or None.
     hidden_dimensions : List[int]
-        Specify the number of hidden neurons for each respective hidden layer of the network. Cannot be empty. 
-    nonlinearity : str  
-        Nonlinearity used between hidden layers. Options are:  
+        Specify the number of hidden neurons for each respective hidden layer of the network. Cannot be empty.
+    nonlinearity : str
+        Nonlinearity used between hidden layers. Options are:
             - "relu": https://pytorch.org/docs/stable/generated/torch.nn.ReLU.html#torch.nn.ReLU  .
-            - "leakyrelu": https://pytorch.org/docs/stable/generated/torch.nn.LeakyReLU.html#torch.nn.LeakyReLU.  
-            - "relu6": https://pytorch.org/docs/stable/generated/torch.nn.ReLU6.html#torch.nn.ReLU6.  
-            - "silu": https://pytorch.org/docs/stable/generated/torch.nn.SiLU.html#torch.nn.SiLU.  
-            - "elu": https://pytorch.org/docs/stable/generated/torch.nn.ELU.html#torch.nn.ELU.  
-            - "hardswish": https://pytorch.org/docs/stable/generated/torch.nn.Hardswish.html#torch.nn.Hardswish.   
+            - "leakyrelu": https://pytorch.org/docs/stable/generated/torch.nn.LeakyReLU.html#torch.nn.LeakyReLU.
+            - "relu6": https://pytorch.org/docs/stable/generated/torch.nn.ReLU6.html#torch.nn.ReLU6.
+            - "silu": https://pytorch.org/docs/stable/generated/torch.nn.SiLU.html#torch.nn.SiLU.
+            - "elu": https://pytorch.org/docs/stable/generated/torch.nn.ELU.html#torch.nn.ELU.
+            - "hardswish": https://pytorch.org/docs/stable/generated/torch.nn.Hardswish.html#torch.nn.Hardswish.
     layernorm : bool
-        If True, the network is regularized with layer normalization after each liner layer.  
-        This may increase performance, see https://arxiv.org/pdf/1709.06560.pdf for info.  
+        If True, the network is regularized with layer normalization after each liner layer.
+        This may increase performance, see https://arxiv.org/pdf/1709.06560.pdf for info.
     log_param_min : int
-        Lower bound for learned log_alpha and log_beta.  
+        Lower bound for learned log_alpha and log_beta.
     log_param_max : int
-        Upper bound for learned log_alpha and log_beta.  
+        Upper bound for learned log_alpha and log_beta.
     """
 
     # member annotations
@@ -750,16 +750,16 @@ class GeneralizedBetaPolicy(Policy):
     def forward(
         self, x: torch.FloatTensor
     ) -> Tuple[torch.FloatTensor, torch.FloatTensor, torch.FloatTensor]:
-        """Returns the learned paremters of the distribution.    
-        
-        Parameters  
-        ----------  
-        x : torch.FloatTensor  
-            Input state tensor.    
-        
-        Returns  
-        -------  
-        Tuple[torch.FloatTensor, torch.FloatTensor, torch.FloatTensor]  
+        """Returns the learned paremters of the distribution.
+
+        Parameters
+        ----------
+        x : torch.FloatTensor
+            Input state tensor.
+
+        Returns
+        -------
+        Tuple[torch.FloatTensor, torch.FloatTensor, torch.FloatTensor]
             Alpha parameter (alpha), Beta parameter (beta), State value estimate (V_hat).
         """
         x = self.trunk(x)
@@ -794,7 +794,7 @@ class GeneralizedBetaPolicy(Policy):
         return log_probs, entropy, V_hat
 
     @torch.no_grad()
-    def sample_action(self, x: torch.Tensor) -> np.array:
+    def sample_action(self, x: torch.Tensor) -> np.ndarray:
         self.eval()
         alpha, beta, _ = self(x)
         beta_dist = D.Beta(alpha, beta)
@@ -818,7 +818,7 @@ def make_policy(
 ) -> Union[
     DiscretePolicy, DiagonalNormalPolicy, DiagonalGMMPolicy, GeneralizedBetaPolicy
 ]:
-    """Constructs a policy network from a given config.  
+    """Constructs a policy network from a given config.
 
     The following config keys need to be specified:
         - "representation_dim": int
@@ -832,15 +832,15 @@ def make_policy(
         - "log_param_min": Optional[float]
         - "log_param_max": Optional[float]
 
-    Parameters  
-    ----------  
-    config : Dict[str, Any]  
-        Policy config dictionary.  
+    Parameters
+    ----------
+    config : Dict[str, Any]
+        Policy config dictionary.
 
-    Returns  
-    -------  
-    Union[DiagonalNormalPolicy, DiagonalGMMPolicy, GeneralizedBetaPolicy]  
-        Policy network intance.    
+    Returns
+    -------
+    Union[DiagonalNormalPolicy, DiagonalGMMPolicy, GeneralizedBetaPolicy]
+        Policy network intance.
     """
 
     # basic config string preprocessing to ensure mapping works later

@@ -43,12 +43,14 @@ class Agent(ABC):
         self.clip = grad_clip
 
     @abstractmethod
-    def act(self) -> Tuple[Any, np.array, np.array, np.array, np.array, np.array]:
+    def act(
+        self,
+    ) -> Tuple[Any, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         ...
 
     @abstractmethod
     def update(
-        self, obs: Tuple[np.array, np.array, np.array, np.array, np.array]
+        self, obs: Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]
     ) -> Dict[str, float]:
         ...
 
@@ -84,7 +86,7 @@ class Agent(ABC):
     def gamma(self) -> float:
         return self.mcts.gamma
 
-    def reset_mcts(self, root_state: np.array) -> None:
+    def reset_mcts(self, root_state: np.ndarray) -> None:
         self.mcts.root_node = None
         self.mcts.root_state = root_state
 
@@ -96,9 +98,8 @@ class Agent(ABC):
                 loss = self.update(obs)
                 for key in loss.keys():
                     running_loss[key] += loss[key]
-        # FIXME: Doesn't change values in place
         for val in running_loss.values():
-            val /= batches + 1
+            val = val / (batches + 1)
         return running_loss
 
 
@@ -136,7 +137,7 @@ class DiscreteAgent(Agent):
         mcts_env: gym.Env,
         simulation: bool = False,
         deterministic: bool = False,
-    ) -> Tuple[Any, np.array, np.array, np.array, np.array, np.array]:
+    ) -> Tuple[Any, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
 
         self.mcts.search(Env=Env, mcts_env=mcts_env, simulation=simulation)
         state, actions, counts, Qs, V = self.mcts.return_results(self.final_selection)
@@ -152,11 +153,11 @@ class DiscreteAgent(Agent):
 
         return action, state, actions, counts, Qs, V
 
-    def mcts_forward(self, action: int, node: np.array) -> None:
+    def mcts_forward(self, action: int, node: np.ndarray) -> None:
         self.mcts.forward(action, node)
 
     def update(
-        self, obs: Tuple[np.array, np.array, np.array, np.array, np.array]
+        self, obs: Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]
     ) -> Dict[str, float]:
 
         # zero out gradients
@@ -164,10 +165,10 @@ class DiscreteAgent(Agent):
             param.grad = None
 
         # Qs are currently unused in update setp
-        states: np.array
-        actions: np.array
-        counts: np.array
-        V_target: np.array
+        states: np.ndarray
+        actions: np.ndarray
+        counts: np.ndarray
+        V_target: np.ndarray
         states, actions, counts, _, V_target = obs
         states_tensor = torch.from_numpy(states).float().to(self.device)
         values_tensor = (
@@ -241,15 +242,18 @@ class ContinuousAgent(Agent):
         return self.nn.act_limit
 
     # TODO: Factor out
-    def epsilon_greedy(self, actions: np.array, values: np.array) -> np.array:
+    def epsilon_greedy(self, actions: np.ndarray, values: np.ndarray) -> np.ndarray:
         if random.random() < self.epsilon:
             return np.random.choice(actions)[np.newaxis]
         else:
             return actions[values.argmax()][np.newaxis]
 
     def act(  # type: ignore[override]
-        self, Env: gym.Env, mcts_env: gym.Env, simulation: bool = False,
-    ) -> Tuple[Any, np.array, np.array, np.array, np.array, np.array]:
+        self,
+        Env: gym.Env,
+        mcts_env: gym.Env,
+        simulation: bool = False,
+    ) -> Tuple[Any, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
 
         self.mcts.search(Env=Env, mcts_env=mcts_env, simulation=simulation)
         state, actions, counts, Qs, V = self.mcts.return_results(self.final_selection)
@@ -270,7 +274,7 @@ class ContinuousAgent(Agent):
         return action, state, actions, counts, Qs, V
 
     def update(
-        self, obs: Tuple[np.array, np.array, np.array, np.array, np.array]
+        self, obs: Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]
     ) -> Dict[str, float]:
 
         # zero out gradients
@@ -278,10 +282,10 @@ class ContinuousAgent(Agent):
             param.grad = None
 
         # Qs are currently unused in update
-        states: np.array
-        actions: np.array
-        counts: np.array
-        V_target: np.array
+        states: np.ndarray
+        actions: np.ndarray
+        counts: np.ndarray
+        V_target: np.ndarray
         states, actions, counts, _, V_target = obs
 
         actions_tensor = torch.from_numpy(actions).float().to(self.device)
