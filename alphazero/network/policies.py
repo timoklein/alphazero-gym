@@ -18,6 +18,7 @@ __all__ = [
     "DiscretePolicy",
 ]
 
+
 class Policy(nn.Module):
     """Base policy class.
 
@@ -833,12 +834,33 @@ def make_policy(
 
     Parameters
     ----------
-    config : Dict[str, Any]
-        Policy config dictionary.
+    representation_dim: int
+        Dimensionality of the vector state space of the environment.
+    action_dim: int
+        Number of action dimensions in the environment.
+    distribution: str
+        Name of the policy distribution as string ["discrete", "beta", "normal"].
+    hidden_dimensions: List[int]
+        List specification of the MLP policy. Each int element in the list represents a hidden
+        layer in the  network with the respective number of neurons.
+    nonlinearity: str
+        Nonlinearity (activation function) used in the policy network.
+    num_components: Optional[int] = None
+        Number of components for mixture distributions.
+    num_actions: Optional[int] = None
+        Number of available actions. Used in the discrete policy.
+    action_bound: Optional[float] = None
+        Action bounds for the squashed normal or squashed GMM policy.
+    layernorm: bool = False
+        Use Layernorm in the policy network if set to True.
+    log_param_min: float = -5
+        Lower bound of the learned log parameters (standard deviation for Normal distributions).
+    log_param_max: float = 2
+        Upper bound of the learned log parameters.
 
     Returns
     -------
-    Union[DiagonalNormalPolicy, DiagonalGMMPolicy, GeneralizedBetaPolicy]
+    Union[DiscretePolicy, DiagonalNormalPolicy, DiagonalGMMPolicy, GeneralizedBetaPolicy]
         Policy network intance.
     """
 
@@ -856,6 +878,7 @@ def make_policy(
             layernorm=layernorm,
         )
     elif distribution == "beta":
+        assert num_components
         return GeneralizedBetaPolicy(
             representation_dim=representation_dim,
             action_dim=action_dim,
@@ -867,6 +890,7 @@ def make_policy(
             log_param_max=log_param_max,
         )
     else:
+        assert num_components
         if 1 < num_components:
             return DiagonalGMMPolicy(
                 representation_dim=representation_dim,

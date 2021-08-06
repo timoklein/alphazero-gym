@@ -49,7 +49,7 @@ class MCTS(ABC):
         ...
 
     @abstractmethod
-    def search(self, Env: gym.Env, mcts_env: gym.Env, simulation: bool) -> None:
+    def search(self, Env: gym.Env) -> None:
         ...
 
     @staticmethod
@@ -103,17 +103,6 @@ class MCTS(ABC):
         return node
 
     @staticmethod
-    def simulation(mcts_env: gym.Env) -> float:
-        V = np.zeros(1)
-        terminal = False
-        while not terminal:
-            action = mcts_env.action_space.sample()
-            _, reward, terminal, _ = mcts_env.step(action)
-            V += reward
-
-        return V.item()
-
-    @staticmethod
     def backprop(node: Node, gamma: float):
         R = node.V
         # loop back-up until root is reached
@@ -135,9 +124,7 @@ class MCTS(ABC):
             [child_action.n for child_action in self.root_node.child_actions]
         )
 
-        Q = np.array(
-            [child_action.Q for child_action in self.root_node.child_actions]
-        )
+        Q = np.array([child_action.Q for child_action in self.root_node.child_actions])
 
         if self.V_target_policy == "greedy":
             V_target = self.get_greedy_value_target(final_selection)
@@ -209,7 +196,7 @@ class MCTSDiscrete(MCTS):
         # only use the neural network to estimate the value if we have none
         if not V:
             node.V = (
-                (self.model.predict_V(state)).item() # type:ignore[operator]
+                (self.model.predict_V(state)).item()  # type:ignore[operator]
                 if not node.terminal
                 else 0.0
             )
@@ -220,18 +207,15 @@ class MCTSDiscrete(MCTS):
             ActionDiscrete(a, parent_node=node, Q_init=node.V)
             for a in range(node.num_actions)
         ]
-        node.priors = self.model.predict_pi(state).flatten() # type:ignore[operator]
+        node.priors = self.model.predict_pi(state).flatten()  # type:ignore[operator]
 
-    def search(self, Env: gym.Env, mcts_env: gym.Env, simulation: bool) -> None:
+    def search(self, Env: gym.Env) -> None:
         """ Perform the MCTS search from the root """
 
         self.initialize_search()
-        if simulation:
-            mcts_env = copy.deepcopy(Env)
-            V = self.simulation(mcts_env)
-            self.evaluation(self.root_node, V)
-        else:
-            self.evaluation(self.root_node)
+
+        # add network estimates to the root node
+        self.evaluation(self.root_node)
         for i in range(self.n_rollouts):
             # reset to root for new trace
             node = self.root_node
@@ -252,17 +236,13 @@ class MCTSDiscrete(MCTS):
                     # expansion
                     node = self.expansion(action, new_state, reward, terminal)
 
-                    # Evaluate node -> Perform simulation if not already in a terminal state
-                    if not terminal and simulation:
-                        V = self.simulation(mcts_env)
-                        self.evaluation(node, V)
-                    else:
-                        self.evaluation(node)
+                    # Evaluate node -> Add distribution and value estimate
+                    self.evaluation(node)
                     break
 
             self.backprop(node, self.gamma)
 
-    def selectionUCT(self, node: NodeDiscrete) -> Action: #type: ignore[override]
+    def selectionUCT(self, node: NodeDiscrete) -> Action:  # type: ignore[override]
         """ Select one of the child actions based on UCT rule """
         assert node.priors is not None
         UCT = np.array(
@@ -335,10 +315,7 @@ class MCTSContinuous(MCTS):
     def initialize_search(self) -> None:
         if self.root_node is None:
             self.root_node = NodeContinuous(
-                self.root_state,
-                r=0.0,
-                terminal=False,
-                parent_action=None
+                self.root_state, r=0.0, terminal=False, parent_action=None
             )
         else:
             # continue from current root
@@ -346,24 +323,21 @@ class MCTSContinuous(MCTS):
         if self.root_node.terminal:
             raise ValueError("Can't do tree search from a terminal node")
 
-    def add_value_estimate(self, node: NodeContinuous, mcts_env: gym.Env = None):
-        if mcts_env:
-            node.V = self.simulation(mcts_env)
-        else:
-            state = (
-                torch.from_numpy(
-                    node.state[
-                        None,
-                    ]
-                )
-                .float()
-                .to(self.device)
+    def add_value_estimate(self, node: NodeContinuous):
+        state = (
+            torch.from_numpy(
+                node.state[
+                    None,
+                ]
             )
-            node.V = (
-                np.squeeze(self.model.predict_V(state)) #type: ignore[operator]
-                if not node.terminal
-                else np.array(0.0)
-            )
+            .float()
+            .to(self.device)
+        )
+        node.V = (
+            np.squeeze(self.model.predict_V(state))  # type: ignore[operator]
+            if not node.terminal
+            else np.array(0.0)
+        )
 
     def add_pw_action(self, node: NodeContinuous) -> None:
         state = (
@@ -375,21 +349,16 @@ class MCTSContinuous(MCTS):
             .float()
             .to(self.device)
         )
-        action = self.model.sample_action(state) #type: ignore[operator]
+        action = self.model.sample_action(state)  # type: ignore[operator]
         new_child = ActionContinuous(action, parent_node=node, Q_init=node.V)
         node.child_actions.append(new_child)
 
-    def search(self, Env: gym.Env, mcts_env: gym.Env, simulation: bool) -> None:
+    def search(self, Env: gym.Env) -> None:
         """ Perform the MCTS search from the root """
 
         self.initialize_search()
-        if simulation:
-            mcts_env = copy.deepcopy(Env)
-            self.add_value_estimate(self.root_node, mcts_env)
-            self.add_pw_action(self.root_node)
-        else:
-            self.add_value_estimate(self.root_node)
-            self.add_pw_action(self.root_node)
+        self.add_value_estimate(self.root_node)
+        self.add_pw_action(self.root_node)
 
         for i in range(self.n_rollouts):
             # reset to root for new trace
@@ -404,6 +373,7 @@ class MCTSContinuous(MCTS):
                 # take step
                 new_state, reward, terminal, _ = mcts_env.step(action.action)
                 reward /= PENDULUM_R_SCALE
+
                 if hasattr(action, "child_node"):
                     # selection
                     node = self.selection(action)
@@ -414,10 +384,7 @@ class MCTSContinuous(MCTS):
                         action, np.squeeze(new_state), reward, terminal
                     )
 
-                    if not terminal and simulation:
-                        self.add_value_estimate(node, mcts_env)
-                    else:
-                        self.add_value_estimate(node)
+                    self.add_value_estimate(node)
                     break
 
             self.backprop(node, self.gamma)

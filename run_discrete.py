@@ -100,7 +100,7 @@ def run_discrete_agent(cfg: DictConfig):
         for t in range(cfg.max_episode_length):
             # MCTS step
             # run mcts and extract the root output
-            action, s, actions, counts, Qs, V = agent.act(Env=Env, mcts_env=mcts_env)
+            action, s, actions, counts, Qs, V = agent.act(Env=Env)
             buffer.store((s, actions, counts, Qs, V))
 
             # Make the true step

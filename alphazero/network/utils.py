@@ -1,9 +1,10 @@
-from typing import Any, Callable, NamedTuple, Type, Union
-import torch.distributions as D
+from typing import Any, Callable, NamedTuple, Type
 import torch.nn as nn
 
 
 class NonlinearityMapping(NamedTuple):
+    """Helper class mapping attribute names to pytorch nonlinearity callables."""
+
     relu: Callable[..., nn.Module] = nn.ReLU
     leakyrelu: Callable[..., nn.Module] = nn.LeakyReLU
     relu6: Callable[..., nn.Module] = nn.ReLU6
@@ -15,8 +16,22 @@ class NonlinearityMapping(NamedTuple):
 
 def _map_call_dict(
     call_dict: NonlinearityMapping,
-    element: Any,
-) -> Any:
+    element: str,
+) -> Callable[..., nn.Module]:
+    """Access and fetch an element from the nonlinearity mapping call dict.
+
+    Parameters
+    ----------
+    call_dict: NonlinearityMapping
+        NamedTuple mapping attributes to callable pytorch nonlinearities.
+    element: Any
+        String name of the element to be fetched from the call dict.
+
+    Returns
+    -------
+    Callable[..., nn.Module]
+        pytorch nonlinearty
+    """
     if isinstance(element, str):
         element = _process_str(element)
         return getattr(call_dict, element)
