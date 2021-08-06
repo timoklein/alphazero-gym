@@ -18,7 +18,6 @@ __all__ = [
     "DiscretePolicy",
 ]
 
-# TODO: Make this an ABC
 class Policy(nn.Module):
     """Base policy class.
 
@@ -137,9 +136,9 @@ class Policy(nn.Module):
     @property
     def bounds(self) -> np.ndarray:
         if self.action_bound is None:
-            return np.ndarray([-np.inf, np.inf], dtype=np.float32)
+            return np.array([-np.inf, np.inf], dtype=np.float32)
         else:
-            return np.ndarray([-self.action_bound, self.action_bound], dtype=np.float32)
+            return np.array([-self.action_bound, self.action_bound], dtype=np.float32)
 
     @torch.no_grad()
     def get_train_data(
@@ -809,7 +808,7 @@ def make_policy(
     distribution: str,
     hidden_dimensions: List[int],
     nonlinearity: str,
-    num_components: int,
+    num_components: Optional[int] = None,
     num_actions: Optional[int] = None,
     action_bound: Optional[float] = None,
     layernorm: bool = False,

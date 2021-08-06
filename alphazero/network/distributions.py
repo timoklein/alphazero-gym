@@ -26,6 +26,7 @@ class ScaledTanhTransform(D.transforms.Transform):
     # member annotations
     bound: float
     codomain: D.constraints.interval
+    domain = D.constraints.real
     epsilon: float
     bijective: bool = True
     sign: int = +1
@@ -129,6 +130,7 @@ class CenterScaleTransform(D.transforms.Transform):
     # member annotations
     bound: float
     codomain: D.constraints.interval
+    domain = D.constraints.real
     epsilon: float
     bijective: bool = True
     sign: int = +1

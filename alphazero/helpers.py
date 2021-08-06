@@ -1,12 +1,12 @@
 from pathlib import Path
-from typing import Any, Tuple, Union
+from typing import Any, List, Tuple, Union
 import gym
 import numpy as np
 import random
 from gym import spaces
 
 
-def stable_normalizer(x: np.array, temp: float) -> np.array:
+def stable_normalizer(x: np.ndarray, temp: float) -> np.ndarray:
     """ Computes x[i]**temp/sum_i(x[i]**temp) """
     x = (x / np.max(x)) ** temp
     return np.abs(x / np.sum(x))
@@ -37,7 +37,7 @@ def check_space(space: Any) -> Tuple[Tuple[int], bool]:
     return dim, discrete
 
 
-def store_actions(name: str, to_store: np.array) -> None:
+def store_actions(name: str, to_store: List[Any]) -> None:
     """ to prevent losing information due to interruption of process"""
     path = Path("runs/")
     if not path.exists():
@@ -45,7 +45,7 @@ def store_actions(name: str, to_store: np.array) -> None:
 
     actions_path = path / f"{name}.npy"
 
-    np.save(actions_path, to_store)
+    np.save(actions_path, np.array(to_store))
 
 
 ### Atari helpers ###

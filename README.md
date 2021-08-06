@@ -4,8 +4,7 @@ They are based on this repo https://github.com/tmoer/alphazero_singleplayer
 as well as the following paper [A0C: Alpha Zero in Continuous Action Space](https://arxiv.org/pdf/1805.09613.pdf).  
 The discrete agent is tested and works on the gym environment _CartPole_.
 You should be able to train it in a couple of minutes even on a laptop.  
-The continuous agent is tested on _Pendulum_. Here training time is longer
-but if your laptop is decent it shouldn't take more than an hour.  
+The continuous agent is tested on _Pendulum_. If your laptop is decent it shouldn't take more than an hour.  
 It uses a squashed Normal distribution as stochastic policy compared to a transformed beta distribution in A0C. More on the squashed Normal distribution and the SAC algorithm can be found [here](https://github.com/denisyarats/pytorch_sac) (reference implementation) and [here](https://arxiv.org/abs/1801.01290) (paper).  
 
 
@@ -86,4 +85,3 @@ Uses Tensorflow 1.x instead of Pytorch
 ## TODOS
 - [ ] Add documentation
 - [ ] Add discretized agent.
-- [ ] Fix typing.

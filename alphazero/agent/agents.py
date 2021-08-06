@@ -241,7 +241,6 @@ class ContinuousAgent(Agent):
     def action_limit(self) -> float:
         return self.nn.act_limit
 
-    # TODO: Factor out
     def epsilon_greedy(self, actions: np.ndarray, values: np.ndarray) -> np.ndarray:
         if random.random() < self.epsilon:
             return np.random.choice(actions)[np.newaxis]

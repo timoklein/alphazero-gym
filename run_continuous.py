@@ -152,10 +152,11 @@ def run_continuous_agent(cfg: DictConfig):
         if isinstance(agent.loss, A0CLossTuned):
             info_dict["alpha"] = agent.loss.alpha.detach().cpu().item()
 
-        run.log(
-            info_dict,
-            step=ep,
-        )
+        if run is not None:
+            run.log(
+                info_dict,
+                step=ep,
+            )
 
         reward = np.round(R, 2)
         pbar.set_description(f"{ep=}, {reward=}, {t_total=}")

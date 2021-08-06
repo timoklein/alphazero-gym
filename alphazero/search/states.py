@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import List, Optional, cast
+from typing import List, Optional, Union, cast
 import numpy as np
 from math import ceil
 from abc import ABC, abstractmethod
@@ -10,10 +10,10 @@ class Node(ABC):
     state: np.ndarray
     r: float
     terminal: bool
-    parent_action: Action
+    parent_action: Optional[Action]
     n: int
-    V: Optional[float]
-    child_actions: Optional[List[Action]]
+    V: float
+    child_actions: List[Action]
 
     _slots__ = (
         "state",
@@ -37,7 +37,7 @@ class Node(ABC):
 
 class Action(ABC):
 
-    action: np.ndarray
+    action: Union[np.ndarray, int]
     parent_node: Node
     W: float
     n: int
@@ -66,11 +66,11 @@ class NodeDiscrete(Node):
     state: np.ndarray
     r: float
     terminal: bool
-    parent_action: ActionDiscrete
+    parent_action: Optional[ActionDiscrete]
     n: int
-    V: Optional[float]
-    child_actions: Optional[List[ActionDiscrete]]  # type: ignore[assignment]
-    priors: np.ndarray
+    V: float
+    child_actions: List[ActionDiscrete]  # type: ignore[assignment]
+    priors: Optional[np.ndarray]
     num_actions: int
 
     __slots__ = "priors", "num_actions"
@@ -80,7 +80,7 @@ class NodeDiscrete(Node):
         state: np.ndarray,
         r: float,
         terminal: bool,
-        parent_action: ActionDiscrete,
+        parent_action: Optional[ActionDiscrete],
         num_actions: int,
     ) -> None:
         """ Initialize a new node """
@@ -89,12 +89,9 @@ class NodeDiscrete(Node):
         self.terminal = terminal  # whether the domain terminated in this node
         self.parent_action = parent_action
         self.n = 0
-        self.V = None
 
         # Child actions
         self.num_actions = num_actions
-        self.child_actions = None
-        self.priors = None
 
     @property
     def has_children(self) -> bool:
@@ -111,9 +108,9 @@ class NodeContinuous(Node):
     state: np.ndarray
     r: float
     terminal: bool
-    parent_action: ActionContinuous
+    parent_action: Optional[ActionContinuous]
     n: int
-    V: Optional[float]
+    V: float
     child_actions: List[ActionContinuous]  # type: ignore[assignment]
 
     def __init__(
@@ -121,7 +118,7 @@ class NodeContinuous(Node):
         state: np.ndarray,
         r: float,
         terminal: bool,
-        parent_action: ActionContinuous,
+        parent_action: Optional[ActionContinuous],
     ) -> None:
         """ Initialize a new node """
         self.state = state  # game state
@@ -129,7 +126,6 @@ class NodeContinuous(Node):
         self.terminal = terminal  # whether the domain terminated in this node
         self.parent_action = parent_action
         self.n = 0
-        self.V = None
 
         # Child actions
         self.child_actions = []
@@ -157,12 +153,12 @@ class NodeContinuous(Node):
 class ActionDiscrete(Action):
     """ Action object """
 
-    action: np.ndarray
+    action: int
     parent_node: NodeDiscrete
     W: float
     n: int
     Q: float
-    child_node: Optional[NodeDiscrete]
+    child_node: NodeDiscrete
 
     def __init__(self, action: int, parent_node: NodeDiscrete, Q_init: float) -> None:
         self.action = action
@@ -170,8 +166,6 @@ class ActionDiscrete(Action):
         self.Q = Q_init
         self.W = 0.0
         self.n = 0
-
-        self.child_node = None
 
     def add_child_node(
         self, state: np.ndarray, r: float, terminal: bool
@@ -195,7 +189,7 @@ class ActionContinuous(Action):
     W: float
     n: int
     Q: float
-    child_node: Optional[NodeContinuous]
+    child_node: NodeContinuous
 
     def __init__(self, action: np.ndarray, parent_node: NodeContinuous, Q_init: float):
         self.action = action
@@ -203,8 +197,6 @@ class ActionContinuous(Action):
         self.Q = Q_init
         self.W = 0.0
         self.n = 0
-
-        self.child_node = None
 
     def add_child_node(
         self, state: np.ndarray, r: float, terminal: bool

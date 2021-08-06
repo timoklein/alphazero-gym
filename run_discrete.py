@@ -133,10 +133,11 @@ def run_discrete_agent(cfg: DictConfig):
 
         # agent.save_checkpoint(env=Env)
 
-        run.log(
-            info_dict,
-            step=ep,
-        )
+        if run is not None:
+            run.log(
+                info_dict,
+                step=ep,
+            )
 
         reward = np.round(R, 2)
         pbar.set_description(f"{ep=}, {reward=}, {t_total=}")

@@ -1,7 +1,7 @@
 from __future__ import annotations
 import random
 import numpy as np
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 
 class ReplayBuffer:
@@ -19,7 +19,6 @@ class ReplayBuffer:
         self.max_size = max_size
         self.batch_size = batch_size
         self.clear()
-        self.sample_array = None
         self.sample_index = 0
 
     def clear(self) -> None:
@@ -42,7 +41,7 @@ class ReplayBuffer:
 
     def reshuffle(self) -> None:
         self.sample_array = np.arange(self.size)
-        random.shuffle(self.sample_array)
+        np.random.shuffle(self.sample_array)
         self.sample_index = 0
 
     def __iter__(self) -> ReplayBuffer:
@@ -60,6 +59,8 @@ class ReplayBuffer:
             self.reshuffle()  # Reset for the next epoch
             raise (StopIteration)
 
+
+        assert self.sample_array is not None
         if self.sample_index + 2 * self.batch_size > self.size:
             indices = self.sample_array[self.sample_index :]
             batch = [self.experience[i] for i in indices]

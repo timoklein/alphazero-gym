@@ -1,6 +1,6 @@
 import copy
 import random
-from typing import Tuple
+from typing import Any, Optional, Tuple, Union
 import gym
 import torch
 import numpy as np
@@ -60,17 +60,17 @@ class MCTS(ABC):
     def get_off_policy_value_target(Q) -> np.ndarray:
         return Q.max()
 
-    def get_greedy_value_target(self, final_selection: str) -> np.ndarray:
+    def get_greedy_value_target(self, final_selection: str) -> Any:
         node = self.root_node
 
         while node.terminal and node.has_children:
             if final_selection == "max_value":
-                Q = np.ndarray(
+                Q = np.array(
                     [child_action.Q for child_action in self.root_node.child_actions]
                 )
                 child = node.child_actions[Q.argmax()].child_node
             else:
-                counts = np.ndarray(
+                counts = np.array(
                     [child_action.n for child_action in node.child_actions]
                 )
                 child = node.child_actions[counts.argmax()].child_node
@@ -80,10 +80,9 @@ class MCTS(ABC):
             else:
                 node = child
 
-        Q = np.ndarray([child_action.Q for child_action in node.child_actions])
+        Q = np.array([child_action.Q for child_action in node.child_actions])
         return Q.max()
 
-    # TODO: Factor out
     def epsilon_greedy(self, node: Node, UCT: np.ndarray) -> Action:
         if random.random() < self.epsilon:
             # return a random child if the epsilon greedy conditions are met
@@ -93,7 +92,7 @@ class MCTS(ABC):
             return node.child_actions[winner]
 
     @staticmethod
-    def selection(action: Action) -> Node:
+    def selection(action: Action) -> Optional[Node]:
         return action.child_node
 
     @staticmethod
@@ -104,7 +103,7 @@ class MCTS(ABC):
         return node
 
     @staticmethod
-    def simulation(mcts_env: gym.Env) -> np.ndarray:
+    def simulation(mcts_env: gym.Env) -> float:
         V = np.zeros(1)
         terminal = False
         while not terminal:
@@ -112,7 +111,7 @@ class MCTS(ABC):
             _, reward, terminal, _ = mcts_env.step(action)
             V += reward
 
-        return V.unsqueeze(dim=0)
+        return V.item()
 
     @staticmethod
     def backprop(node: Node, gamma: float):
@@ -129,14 +128,14 @@ class MCTS(ABC):
         self, final_selection: str
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """ Process the output at the root node """
-        actions = np.ndarray(
+        actions = np.array(
             [child_action.action for child_action in self.root_node.child_actions]
         )
-        counts = np.ndarray(
+        counts = np.array(
             [child_action.n for child_action in self.root_node.child_actions]
         )
 
-        Q = np.ndarray(
+        Q = np.array(
             [child_action.Q for child_action in self.root_node.child_actions]
         )
 
@@ -181,7 +180,7 @@ class MCTSDiscrete(MCTS):
 
         self.num_actions = num_actions
 
-    def initialize_search(self, env: gym.Env) -> None:
+    def initialize_search(self) -> None:
         if self.root_node is None:
             self.root_node = NodeDiscrete(
                 self.root_state,
@@ -210,9 +209,9 @@ class MCTSDiscrete(MCTS):
         # only use the neural network to estimate the value if we have none
         if not V:
             node.V = (
-                np.squeeze(self.model.predict_V(state))
+                (self.model.predict_V(state)).item() # type:ignore[operator]
                 if not node.terminal
-                else np.ndarray(0.0)
+                else 0.0
             )
         else:
             node.V = V
@@ -221,12 +220,12 @@ class MCTSDiscrete(MCTS):
             ActionDiscrete(a, parent_node=node, Q_init=node.V)
             for a in range(node.num_actions)
         ]
-        node.priors = self.model.predict_pi(state).flatten()
+        node.priors = self.model.predict_pi(state).flatten() # type:ignore[operator]
 
     def search(self, Env: gym.Env, mcts_env: gym.Env, simulation: bool) -> None:
         """ Perform the MCTS search from the root """
 
-        snapshot = self.initialize_search(env=Env)
+        self.initialize_search()
         if simulation:
             mcts_env = copy.deepcopy(Env)
             V = self.simulation(mcts_env)
@@ -245,7 +244,7 @@ class MCTSDiscrete(MCTS):
 
                 # take step
                 new_state, reward, terminal, _ = mcts_env.step(action.action)
-                if getattr(action, "child_node"):
+                if hasattr(action, "child_node"):
                     # selection
                     node = self.selection(action)
                     continue
@@ -263,9 +262,10 @@ class MCTSDiscrete(MCTS):
 
             self.backprop(node, self.gamma)
 
-    def selectionUCT(self, node: NodeDiscrete) -> ActionDiscrete:
+    def selectionUCT(self, node: NodeDiscrete) -> Action: #type: ignore[override]
         """ Select one of the child actions based on UCT rule """
-        UCT = np.ndarray(
+        assert node.priors is not None
+        UCT = np.array(
             [
                 child_action.Q
                 + prior * self.c_uct * (np.sqrt(node.n + 1) / (child_action.n + 1))
@@ -338,7 +338,7 @@ class MCTSContinuous(MCTS):
                 self.root_state,
                 r=0.0,
                 terminal=False,
-                parent_action=None,
+                parent_action=None
             )
         else:
             # continue from current root
@@ -360,9 +360,9 @@ class MCTSContinuous(MCTS):
                 .to(self.device)
             )
             node.V = (
-                np.squeeze(self.model.predict_V(state))
+                np.squeeze(self.model.predict_V(state)) #type: ignore[operator]
                 if not node.terminal
-                else np.ndarray(0.0)
+                else np.array(0.0)
             )
 
     def add_pw_action(self, node: NodeContinuous) -> None:
@@ -375,7 +375,7 @@ class MCTSContinuous(MCTS):
             .float()
             .to(self.device)
         )
-        action = self.model.sample_action(state)
+        action = self.model.sample_action(state) #type: ignore[operator]
         new_child = ActionContinuous(action, parent_node=node, Q_init=node.V)
         node.child_actions.append(new_child)
 
@@ -404,7 +404,7 @@ class MCTSContinuous(MCTS):
                 # take step
                 new_state, reward, terminal, _ = mcts_env.step(action.action)
                 reward /= PENDULUM_R_SCALE
-                if getattr(action, "child_node"):
+                if hasattr(action, "child_node"):
                     # selection
                     node = self.selection(action)
                     continue
@@ -422,14 +422,14 @@ class MCTSContinuous(MCTS):
 
             self.backprop(node, self.gamma)
 
-    def selectionUCT(self, node: NodeContinuous) -> ActionContinuous:  # type: ignore[return-value, override]
+    def selectionUCT(self, node: NodeContinuous) -> Action:  # type: ignore[return-value, override]
         """ Select one of the child actions based on UCT rule """
         # no epsilon greedy if we add a node with progressive widening
         if node.check_pw(self.c_pw, self.kappa):
             self.add_pw_action(node)
             return node.child_actions[-1]
         else:
-            UCT = np.ndarray(
+            UCT = np.array(
                 [
                     child_action.Q
                     + self.c_uct * (np.sqrt(node.n + 1) / (child_action.n + 1))

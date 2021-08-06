@@ -68,7 +68,6 @@ class AlphaZeroLoss(Loss):
         return {"loss": loss, "policy_loss": policy_loss, "value_loss": value_loss}
 
 
-# FIXME: Parameterize loss clamping
 class A0CLoss(Loss):
 
     tau: float

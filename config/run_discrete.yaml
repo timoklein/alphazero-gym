@@ -4,7 +4,6 @@ defaults:
   - optimizer: RMSProp
   - policy: DiscretePolicy
   - loss: A0CLossTuned
-  - hydra/sweeper: ax
 
 game: CartPole-v0
 seed: 34

@@ -4,7 +4,6 @@ defaults:
   - optimizer: RMSProp
   - policy: ContinuousPolicy
   - loss: A0CLossTuned
-  - hydra/sweeper: ax
     
 
 game: Pendulum-v0
