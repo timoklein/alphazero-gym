@@ -83,5 +83,4 @@ AlphaZero implementation for OpenAI gym by the original author. Kept as referenc
 Uses Tensorflow 1.x instead of Pytorch  
 
 ## TODOS
-- [ ] Add documentation
 - [ ] Add discretized agent.

@@ -2,8 +2,6 @@ from __future__ import annotations
 import numpy as np
 from typing import List, Tuple
 
-from torch._C import namedtuple_solution_cloned_coefficient
-
 
 class ReplayBuffer:
     """Replay buffer class.

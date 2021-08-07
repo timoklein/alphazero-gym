@@ -12,14 +12,8 @@ from omegaconf.dictconfig import DictConfig
 
 from alphazero.helpers import stable_normalizer
 from alphazero.agent.buffers import ReplayBuffer
-from alphazero.agent.losses import A0CLoss, A0CLossTuned, AlphaZeroLoss
-from alphazero.search.mcts import MCTSContinuous, MCTSDiscrete
-from alphazero.network.policies import (
-    DiscretePolicy,
-    DiagonalNormalPolicy,
-    DiagonalGMMPolicy,
-    GeneralizedBetaPolicy,
-)
+from alphazero.agent.losses import A0CLoss
+from alphazero.search.mcts import MCTSDiscrete
 
 
 class Agent(ABC):
