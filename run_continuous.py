@@ -46,13 +46,6 @@ def run_continuous_agent(cfg: DictConfig):
     agent = hydra.utils.instantiate(cfg.agent)
     print(agent.nn.bounds)
 
-    if cfg.policy.distribution == "beta":
-        distribution = "Beta"
-    elif cfg.policy.distribution == "normal" and cfg.policy.action_bound:
-        distribution = "Squashed Normal"
-    else:
-        distribution = "Normal"
-
     config = {
         "Date": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "Environment": Env.unwrapped.spec.id,
@@ -78,8 +71,6 @@ def run_continuous_agent(cfg: DictConfig):
         "Clamp log param": True,
         "Clamp loss": "Loss scaling",
         "Log prob scale": "Corrected entropy",
-        "Num mixture components": cfg.policy.num_components,
-        "Distribution": distribution,
         "Optimizer": "Adam"
         if cfg.optimizer._target_ == "torch.optim.Adam"
         else "RMSProp",

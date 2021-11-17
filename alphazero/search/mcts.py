@@ -132,10 +132,19 @@ class MCTS(ABC):
         actions = np.array(
             [child_action.action for child_action in self.root_node.child_actions]
         )
-        counts = np.array(
-            [child_action.n for child_action in self.root_node.child_actions]
-        )
+        # TODO: Use the indices here
+        available_actions = [round( (2 * j / 19 - 1)*2, 2) for j in range(20)]
+        chosen_actions = {
+            round(action.action.item(), 2): action.n for action in self.root_node.child_actions
+        }
+        count_list = []
+        for a in available_actions:
+            if a in chosen_actions:
+                count_list.append(chosen_actions[a])
+            else:
+                count_list.append(0)
 
+        counts = np.array(count_list)
         Q = np.array([child_action.Q for child_action in self.root_node.child_actions])
 
         if self.V_target_policy == "greedy":
@@ -195,7 +204,15 @@ class MCTSDiscrete(MCTS):
             raise ValueError("Can't do tree search from a terminal node")
 
     def evaluation(self, node: NodeDiscrete, V: float = None) -> None:
-        state = torch.from_numpy(node.state[None,]).float().to(self.device)
+        state = (
+            torch.from_numpy(
+                node.state[
+                    None,
+                ]
+            )
+            .float()
+            .to(self.device)
+        )
 
         # only use the neural network to estimate the value if we have none
         if not V:
@@ -325,7 +342,10 @@ class MCTSContinuous(MCTS):
     def initialize_search(self) -> None:
         if self.root_node is None:
             self.root_node = NodeContinuous(
-                self.root_state, r=0.0, terminal=False, parent_action=None,
+                self.root_state,
+                r=0.0,
+                terminal=False,
+                parent_action=None,
             )
         else:
             # continue from current root
@@ -337,7 +357,15 @@ class MCTSContinuous(MCTS):
         if mcts_env:
             node.V = self.simulation(mcts_env)
         else:
-            state = torch.from_numpy(node.state[None,]).float().to(self.device)
+            state = (
+                torch.from_numpy(
+                    node.state[
+                        None,
+                    ]
+                )
+                .float()
+                .to(self.device)
+            )
             node.V = (
                 np.squeeze(self.model.predict_V(state))
                 if not node.terminal
@@ -345,8 +373,20 @@ class MCTSContinuous(MCTS):
             )
 
     def add_pw_action(self, node: NodeContinuous) -> None:
-        state = torch.from_numpy(node.state[None,]).float().to(self.device)
+        state = (
+            torch.from_numpy(
+                node.state[
+                    None,
+                ]
+            )
+            .float()
+            .to(self.device)
+        )
+        child_actions = [action.action for action in node.child_actions]
         action = self.model.sample_action(state)
+        while action in child_actions:
+            # Resample a new action if the action already exists
+            action = self.model.sample_action(state)
         new_child = ActionContinuous(action, parent_node=node, Q_init=node.V)
         node.child_actions.append(new_child)
 

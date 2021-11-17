@@ -1,6 +1,6 @@
 # @package _global_
 agent:
-  _target_: alphazero.agent.agents.ContinuousAgent
+  _target_: alphazero.agent.agents.DiscretizedAgent
   policy_cfg: ${policy}
   mcts_cfg: ${mcts}
   loss_cfg: ${loss}

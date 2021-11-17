@@ -1,0 +1,10 @@
+# @package _group_
+_target_: alphazero.network.policies.DiscretizedPolicy # targets a function
+representation_dim: ??? # set later
+action_dim: ??? # set later
+action_bound: ??? # set later
+hidden_dimensions: [128, 128, 128]
+nonlinearity: "elu" # any of relu, leakyrelu, relu6, elu, silu/swish, hardswish
+layernorm: false
+log_param_min: -5
+log_param_max: 2

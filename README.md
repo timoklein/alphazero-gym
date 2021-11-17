@@ -1,29 +1,11 @@
-# What is this
-This repo contains multiple, self-contained implementations of AlphaZero. 
-They are based on this repo https://github.com/tmoer/alphazero_singleplayer
-as well as the following paper [A0C: Alpha Zero in Continuous Action Space](https://arxiv.org/pdf/1805.09613.pdf)
+# Discretized A0C
 
-## master branch
+This is a *VERY HACKY* implementation of the ordinal discretization scheme
+ mentioned in
+ [Discretizing Continuous Action Space for On-Policy Optimization](https://arxiv.org/pdf/1901.10500.pdf).
 
-## tf branch
-Base implementation.  
+Notes:
 
-## TDOS
-- [ ] Add  model saving and loading using the config for instantiation.  
-- [ ] Add new policy classes.  
-- [ ] Fix WandB logging.  
-- [ ] Make an installable package.  
-- [ ] Add typing.  
-- [ ] Fix Hydra instantiation.   
-- [ ] Docs. 
-- [ ] Delete tf branch.  
-
-
-## Possible Enhancements to try
-- [ ] Implement stochastic weight averaging.  
-- [ ] Test a prioritized replay buffer.  
-- [ ] Warm starting.  
-- [ ] RAD style data augmentations.  
-- [ ] Playout cap randomization.  
-- [ ] Test L2 reg (BatchNorm makes no sense for multimodal data).  
-- [ ] Subtract state dependent baseline in loss (mean/median of counts).
+- The code works and runs. Performance should be slightly improved over continuous control.  
+- There are several hardcoded values in the MCTS and Policy for the number of bins.  
+- I won't integrate this into the main branch unless there is a specific reason for me to work with this codebase again.  

@@ -12,7 +12,6 @@ from omegaconf.dictconfig import DictConfig
 
 from alphazero.helpers import stable_normalizer
 from alphazero.agent.buffers import ReplayBuffer
-from alphazero.network.policies import make_policy
 from alphazero.agent.losses import A0CLoss
 
 
@@ -96,117 +95,9 @@ class Agent(ABC):
                 loss = self.update(obs)
                 for key in loss.keys():
                     running_loss[key] += loss[key]
-        # FIXME: Doesn't change values in place
-        for val in running_loss.values():
-            val /= batches + 1
+        for key, val in running_loss.items():
+            running_loss[key] = val / batches + 1
         return running_loss
-
-
-class DiscreteAgent(Agent):
-    def __init__(
-        self,
-        policy_cfg: DictConfig,
-        mcts_cfg: DictConfig,
-        loss_cfg: DictConfig,
-        optimizer_cfg: DictConfig,
-        final_selection: str,
-        train_epochs: int,
-        grad_clip: float,
-        temperature: float,
-        device: str,
-    ) -> None:
-
-        super().__init__(
-            policy_cfg=policy_cfg,
-            loss_cfg=loss_cfg,
-            mcts_cfg=mcts_cfg,
-            optimizer_cfg=optimizer_cfg,
-            final_selection=final_selection,
-            train_epochs=train_epochs,
-            grad_clip=grad_clip,
-            device=device,
-        )
-
-        # initialize values
-        self.temperature = temperature
-
-    def act(  # type: ignore[override]
-        self,
-        Env: gym.Env,
-        mcts_env: gym.Env,
-        simulation: bool = False,
-        deterministic: bool = False,
-    ) -> Tuple[Any, np.array, np.array, np.array, np.array, np.array]:
-
-        self.mcts.search(Env=Env, mcts_env=mcts_env, simulation=simulation)
-        state, actions, counts, Qs, V = self.mcts.return_results(self.final_selection)
-
-        if self.final_selection == "max_value":
-            # select final action based on max Q value
-            pi = stable_normalizer(Qs, self.temperature)
-            action = pi.argmax() if deterministic else np.random.choice(len(pi), p=pi)
-        else:
-            # select the final action based on visit counts
-            pi = stable_normalizer(counts, self.temperature)
-            action = pi.argmax() if deterministic else np.random.choice(len(pi), p=pi)
-
-        return action, state, actions, counts, Qs, V
-
-    def mcts_forward(self, action: int, node: np.array) -> None:
-        self.mcts.forward(action, node)
-
-    def update(
-        self, obs: Tuple[np.array, np.array, np.array, np.array, np.array]
-    ) -> Dict[str, float]:
-
-        # zero out gradients
-        for param in self.nn.parameters():
-            param.grad = None
-
-        # Qs are currently unused in update setp
-        states: np.array
-        actions: np.array
-        counts: np.array
-        V_target: np.array
-        states, actions, counts, _, V_target = obs
-        states_tensor = torch.from_numpy(states).float().to(self.device)
-        values_tensor = (
-            torch.from_numpy(V_target).unsqueeze(dim=1).float().to(self.device)
-        )
-
-        if isinstance(self.loss, A0CLoss):
-            actions_tensor = torch.from_numpy(actions).float().to(self.device)
-            # regularize the counts to always be greater than 0
-            # this prevents the logarithm from producing nans in the next step
-            counts += 1
-            counts_tensor = torch.from_numpy(counts).float().to(self.device)
-
-            log_probs, entropy, V_hat = self.nn.get_train_data(
-                states_tensor, actions_tensor
-            )
-            loss_dict = self.loss(
-                log_probs=log_probs,
-                counts=counts_tensor,
-                entropy=entropy,
-                V=values_tensor,
-                V_hat=V_hat,
-            )
-        else:
-            action_probs_tensor = F.softmax(
-                torch.from_numpy(counts).float(), dim=-1
-            ).to(self.device)
-            pi_logits, V_hat = self.nn(states_tensor)
-            loss_dict = self.loss(pi_logits, action_probs_tensor, V_hat, values_tensor)
-
-        loss_dict["loss"].backward()
-
-        if self.clip:
-            clip_grad_norm(self.nn.parameters(), self.clip)
-
-        self.optimizer.step()
-
-        info_dict = {key: float(value) for key, value in loss_dict.items()}
-        return info_dict
 
 
 class ContinuousAgent(Agent):
@@ -248,7 +139,10 @@ class ContinuousAgent(Agent):
             return actions[values.argmax()][np.newaxis]
 
     def act(  # type: ignore[override]
-        self, Env: gym.Env, mcts_env: gym.Env, simulation: bool = False,
+        self,
+        Env: gym.Env,
+        mcts_env: gym.Env,
+        simulation: bool = False,
     ) -> Tuple[Any, np.array, np.array, np.array, np.array, np.array]:
 
         self.mcts.search(Env=Env, mcts_env=mcts_env, simulation=simulation)
@@ -299,6 +193,91 @@ class ContinuousAgent(Agent):
             log_probs=log_probs,
             counts=counts_tensor,
             entropy=entropy,
+            V=values_tensor,
+            V_hat=V_hat,
+        )
+
+        loss_dict["loss"].backward()
+
+        if self.clip:
+            clip_grad_norm(self.nn.parameters(), self.clip)
+
+        self.optimizer.step()
+
+        info_dict = {key: float(value) for key, value in loss_dict.items()}
+        return info_dict
+
+
+class DiscretizedAgent(Agent):
+    def __init__(
+        self,
+        policy_cfg: DictConfig,
+        mcts_cfg: DictConfig,
+        loss_cfg: DictConfig,
+        optimizer_cfg: DictConfig,
+        final_selection: str,
+        epsilon: float,
+        train_epochs: int,
+        grad_clip: float,
+        device: str,
+    ) -> None:
+
+        super().__init__(
+            policy_cfg=policy_cfg,
+            loss_cfg=loss_cfg,
+            mcts_cfg=mcts_cfg,
+            optimizer_cfg=optimizer_cfg,
+            final_selection=final_selection,
+            train_epochs=train_epochs,
+            grad_clip=grad_clip,
+            device=device,
+        )
+
+        self.epsilon = epsilon
+
+    @property
+    def action_limit(self) -> float:
+        return self.nn.act_limit
+
+    def act(  # type: ignore[override]
+        self,
+        Env: gym.Env,
+        mcts_env: gym.Env,
+        simulation: bool = False,
+    ) -> Tuple[Any, np.array, np.array, np.array, np.array, np.array]:
+
+        self.mcts.search(Env=Env, mcts_env=mcts_env, simulation=simulation)
+        state, actions, counts, Qs, V = self.mcts.return_results(self.final_selection)
+        actions_sorted = np.sort(actions)
+        action = actions_sorted[counts[counts > 0].argmax()][np.newaxis]
+        return action, state, actions, counts, Qs, V
+
+    def update(
+        self, obs: Tuple[np.array, np.array, np.array, np.array, np.array]
+    ) -> Dict[str, float]:
+
+        # zero out gradients
+        for param in self.nn.parameters():
+            param.grad = None
+
+        # Qs are currently unused in update
+        states: np.array
+        actions: np.array
+        counts: np.array
+        V_target: np.array
+        states, actions, counts, _, V_target = obs
+
+        actions_tensor = torch.from_numpy(actions).float().to(self.device)
+        states_tensor = torch.from_numpy(states).float().to(self.device)
+        counts_tensor = torch.from_numpy(counts).float().to(self.device)
+        values_tensor = (
+            torch.from_numpy(V_target).unsqueeze(dim=1).float().to(self.device)
+        )
+
+        pi, V_hat = self.nn.get_train_data(states_tensor, actions_tensor)
+        loss_dict = self.loss(
+            pi=pi,
+            counts=counts_tensor,
             V=values_tensor,
             V_hat=V_hat,
         )

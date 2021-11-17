@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.utils import clip_grad_norm
 from torch.optim import Adam
+import torch.distributions as D
 
 from typing import Dict, Union
 from abc import abstractmethod
@@ -224,4 +225,64 @@ class A0CLossTuned(A0CLoss):
             "entropy_loss": entropy_loss,
             "value_loss": value_loss,
             "alpha_loss": alpha_loss,
+        }
+
+
+class DiscretizedLoss(Loss):
+
+    tau: float
+    policy_coeff: float
+    alpha: Union[float, torch.Tensor]
+    value_coeff: float
+    reduction: str
+
+    def __init__(
+        self,
+        tau: float,
+        policy_coeff: float,
+        alpha: Union[float, torch.Tensor],
+        value_coeff: float,
+        reduction: str,
+    ) -> None:
+        super().__init__()
+        self.tau = tau
+        self.policy_coeff = policy_coeff
+        self.alpha = alpha
+        self.value_coeff = value_coeff
+        self.reduction = reduction
+
+    def _calculate_policy_loss(  # type: ignore[override]
+        self, pi, counts
+    ) -> torch.Tensor:
+        # pi_hat = D.Categorical(probs=torch.softmax(counts, dim=-1))
+        # return D.kl_divergence(pi_hat, pi).mean()
+        pi_mcts = counts.argmax(dim=1)
+        pi_loss = F.cross_entropy(pi, pi_mcts, reduction="mean")
+        return pi_loss
+
+    def _calculate_value_loss(
+        self, V_hat: torch.Tensor, V: torch.Tensor
+    ) -> torch.Tensor:
+        return F.mse_loss(V_hat, V, reduction=self.reduction)
+
+    def _calculate_entropy_loss(self, entropy: torch.Tensor) -> torch.Tensor:
+        if self.reduction == "mean":
+            return entropy.mean()
+        else:
+            return entropy.sum()
+
+    def forward(  # type: ignore[override]
+        self,
+        pi,
+        counts: torch.Tensor,
+        V: torch.Tensor,
+        V_hat: torch.Tensor,
+    ) -> Dict[str, torch.Tensor]:
+        policy_loss = self.policy_coeff * self._calculate_policy_loss(pi, counts)
+        value_loss = self.value_coeff * self._calculate_value_loss(V_hat, V)
+        loss = policy_loss + value_loss
+        return {
+            "loss": loss,
+            "policy_loss": policy_loss,
+            "value_loss": value_loss,
         }

@@ -2,9 +2,8 @@ defaults:
   - agent: ContinuousAgent
   - mcts: MCTSContinuous
   - optimizer: RMSProp
-  - policy: ContinuousPolicy
-  - loss: A0CLossTuned
-  - hydra/sweeper: ax
+  - policy: DiscretizedPolicy
+  - loss: DiscretizedLoss
     
 
 game: Pendulum-v0

@@ -1,0 +1,7 @@
+# @package _group_
+_target_: alphazero.agent.losses.DiscretizedLoss
+tau: 0.1
+policy_coeff: 1
+alpha: 1
+value_coeff: 1
+reduction: mean
