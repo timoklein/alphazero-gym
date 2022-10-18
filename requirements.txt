@@ -10,7 +10,7 @@ GitPython==3.1.18
 gym==0.19.0
 hydra-core==1.0.6
 idna==3.2
-joblib==1.0.1
+joblib==1.2.0
 numpy==1.21.2
 omegaconf==2.0.6
 pathtools==0.1.2
