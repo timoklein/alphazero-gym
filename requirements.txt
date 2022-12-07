@@ -14,7 +14,7 @@ joblib==1.2.0
 numpy==1.22.0
 omegaconf==2.0.6
 pathtools==0.1.2
-Pillow==9.0.1
+Pillow==9.3.0
 promise==2.3
 protobuf==3.18.3
 psutil==5.8.0
